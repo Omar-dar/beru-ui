@@ -1,19 +1,35 @@
-import { useState, useCallback } from 'react'
-import { Message, ChatResponse } from '../types'
-import { sendMessage } from '../services/api'
+import { useState, useCallback, useEffect } from 'react'
+import { Message } from '../types'
+import { sendMessage, startChat } from '../services/api'
 
 export const useChat = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '0',
-      role: 'tild',
-      content: 'Hej! Jag är Tild. Hur kan jag hjälpa dig idag?',
-      timestamp: new Date(),
-      language: 'sv'
-    }
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Load greeting on start
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const response = await startChat()
+        setMessages([{
+          id: '0',
+          role: 'tild',
+          content: response.response,
+          timestamp: new Date(),
+          language: response.language
+        }])
+      } catch {
+        setMessages([{
+          id: '0',
+          role: 'tild',
+          content: 'Hey! I am Tild. Who am I talking to?',
+          timestamp: new Date()
+        }])
+      }
+    }
+    init()
+  }, [])
 
   const sendUserMessage = useCallback(async (content: string) => {
     if (!content.trim()) return
@@ -30,7 +46,7 @@ export const useChat = () => {
     setError(null)
 
     try {
-      const response: ChatResponse = await sendMessage(content)
+      const response = await sendMessage(content)
       const tildMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'tild',
@@ -46,14 +62,23 @@ export const useChat = () => {
     }
   }, [])
 
-  const clearChat = useCallback(() => {
-    setMessages([{
-      id: '0',
-      role: 'tild',
-      content: 'Hej! Jag är Tild. Hur kan jag hjälpa dig idag?',
-      timestamp: new Date(),
-      language: 'sv'
-    }])
+  const clearChat = useCallback(async () => {
+    try {
+      const response = await startChat()
+      setMessages([{
+        id: '0',
+        role: 'tild',
+        content: response.response,
+        timestamp: new Date()
+      }])
+    } catch {
+      setMessages([{
+        id: '0',
+        role: 'tild',
+        content: 'Hey! I am Tild. Who am I talking to?',
+        timestamp: new Date()
+      }])
+    }
   }, [])
 
   return { messages, loading, error, sendUserMessage, clearChat }
