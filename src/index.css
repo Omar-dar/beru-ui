@@ -1,13 +1,56 @@
+/* Tild theme tokens */
+:root {
+  --tild-bg: #0c0c12;
+  --tild-bg-elevated: #12121c;
+  --tild-surface: #1a1a28;
+  --tild-surface-hover: #222236;
+  --tild-border: #2a2a42;
+  --tild-border-focus: #4f46e5;
+  --tild-text: #eaeaf4;
+  --tild-text-muted: #9090ad;
+  --tild-text-faint: #5c5c78;
+  --tild-accent: #6366f1;
+  --tild-accent-end: #8b5cf6;
+  --tild-accent-soft: #a5b4fc;
+  --tild-user-bubble: #1e1e32;
+  --tild-code-bg: #080810;
+  --tild-code-header: #141422;
+  --tild-error-bg: #2a1520;
+  --tild-error-text: #f87171;
+  --tild-gradient: linear-gradient(135deg, var(--tild-accent), var(--tild-accent-end));
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  background: var(--tild-bg);
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  min-height: 100%;
+  height: 100%;
+  background: var(--tild-bg);
+  color: var(--tild-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  min-height: 100%;
+  background: var(--tild-bg);
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
