@@ -321,6 +321,31 @@
   color: var(--tild-accent-soft);
 }
 
+/* Arabic / RTL */
+.markdown-body--rtl,
+.user-bubble[dir='rtl'],
+.composer-input[dir='rtl'] {
+  text-align: right;
+  unicode-bidi: plaintext;
+}
+
+.markdown-body--rtl blockquote {
+  border-left: none;
+  border-right: 3px solid var(--tild-accent);
+  padding: 0 1em 0 0;
+}
+
+.markdown-body--rtl ul,
+.markdown-body--rtl ol {
+  padding-left: 0;
+  padding-right: 1.5em;
+}
+
+.animated-markdown--rtl .stream-cursor {
+  margin-left: 0;
+  margin-right: 2px;
+}
+
 /* Code blocks */
 .code-block {
   margin: 1em 0;

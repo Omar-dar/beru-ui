@@ -3,6 +3,11 @@ import { Message } from '../types'
 import MarkdownContent from './MarkdownContent'
 import AnimatedMarkdown from './AnimatedMarkdown'
 import ChatDocumentCard from './ChatDocumentCard'
+import {
+  getMessageDirection,
+  getMessageLang,
+  stripBidiControls,
+} from '../utils/textDirection'
 
 interface Props {
   message: Message
@@ -11,6 +16,9 @@ interface Props {
 
 const MessageBubble: React.FC<Props> = ({ message, onReveal }) => {
   const isUser = message.role === 'user'
+  const content = stripBidiControls(message.content)
+  const dir = getMessageDirection(content, message.language, message.text_direction)
+  const lang = getMessageLang(content, message.language)
 
   if (isUser) {
     return (
@@ -19,8 +27,10 @@ const MessageBubble: React.FC<Props> = ({ message, onReveal }) => {
           {message.attachment && (
             <ChatDocumentCard attachment={message.attachment} />
           )}
-          {message.content.trim() && (
-            <div className="user-bubble">{message.content}</div>
+          {content.trim() && (
+            <div className="user-bubble" dir={dir} lang={lang}>
+              {content}
+            </div>
           )}
         </div>
         <div className="chat-avatar chat-avatar--user" aria-hidden>
@@ -37,9 +47,18 @@ const MessageBubble: React.FC<Props> = ({ message, onReveal }) => {
       </div>
       <div className="chat-body">
         {message.animate ? (
-          <AnimatedMarkdown content={message.content} onReveal={onReveal} />
+          <AnimatedMarkdown
+            content={content}
+            language={message.language}
+            textDirection={message.text_direction}
+            onReveal={onReveal}
+          />
         ) : (
-          <MarkdownContent content={message.content} />
+          <MarkdownContent
+            content={content}
+            language={message.language}
+            textDirection={message.text_direction}
+          />
         )}
       </div>
     </div>
