@@ -59,3 +59,22 @@ export interface ChatRequest {
   new_chat?: boolean
   document_id?: string
 }
+
+export interface VoiceCapabilities {
+  stt: boolean
+  stt_engine?: string
+  whisper_model?: string
+  whisper_compute_type?: string
+  tts_engine?: string
+  tts_server: boolean
+  tts_voices?: Record<string, string>
+  tts_note?: string
+  supported_upload_extensions?: string[]
+  recommended_record_format?: string
+  sample_rate_hint_hz?: number
+}
+
+export interface VoiceChatResponse extends ChatResponse {
+  transcript: string
+  transcript_language: string
+}
