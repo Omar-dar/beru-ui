@@ -1,6 +1,20 @@
-# Getting Started with Create React App
+# Tild UI
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Chat GUI for [Tild](https://github.com/Omar-dar/tild). Bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+## Quick start (Mac dev)
+
+```bash
+# Terminal 1 — backend
+cd tild && python3 tild_api.py
+
+# Terminal 2 — UI (uses http://localhost:8000 from .env.development)
+cd tild-ui && npm start
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+For Netlify / phone access, see [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ## Available Scripts
 
