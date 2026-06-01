@@ -18,6 +18,11 @@
   --tild-error-bg: #2a1520;
   --tild-error-text: #f87171;
   --tild-gradient: linear-gradient(135deg, var(--tild-accent), var(--tild-accent-end));
+  --tild-touch-min: 44px;
+  --tild-page-x: max(16px, env(safe-area-inset-left, 0px));
+  --tild-page-x-right: max(16px, env(safe-area-inset-right, 0px));
+  --tild-page-top: env(safe-area-inset-top, 0px);
+  --tild-page-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 *,
@@ -48,7 +53,14 @@ body {
 #root {
   height: 100%;
   min-height: 100%;
+  min-height: 100dvh;
   background: var(--tild-bg);
+}
+
+button,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 code {
