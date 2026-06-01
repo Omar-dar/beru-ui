@@ -18,7 +18,7 @@ const App: React.FC = () => {
     activeDocument,
     showSuggestedPrompts,
     suggestedPrompts,
-    voiceEnabled,
+    voiceDisabledHint,
     voiceSessionOpen,
     voiceMode,
     voiceStatusText,
@@ -69,10 +69,10 @@ const App: React.FC = () => {
           loading={loading}
           uploading={uploading}
           voiceProcessing={voiceProcessing}
-          voiceEnabled={voiceEnabled}
+          voiceDisabledHint={voiceDisabledHint}
           voiceSessionOpen={voiceSessionOpen}
           uploadError={uploadError}
-          voiceError={voiceSessionOpen ? null : voiceError}
+          voiceError={voiceError}
           suggestedPrompts={suggestedPrompts}
           showSuggestedPrompts={showSuggestedPrompts && !!activeDocument}
         />

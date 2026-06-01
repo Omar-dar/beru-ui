@@ -39,6 +39,17 @@ Examples for `REACT_APP_API_URL`:
 - Same Wi‑Fi: `http://192.168.x.x:8000` (Mac IP from System Settings → Network)
 - Phone + HTTPS: `https://your-subdomain.ngrok-free.app` (tunnel to port 8000)
 
+## Microphone on phone
+
+The mic **only works on HTTPS** (Netlify URL is fine). These **do not** work for voice:
+
+- `http://192.168.x.x:8000` or `http://` on your phone
+- `http://localhost` from another device
+
+When you tap the mic, **allow microphone** when Safari/Chrome asks.
+
+Use **Safari or Chrome** on iOS (not an in-app browser like Instagram).
+
 ## Backend on Mac (required for phone / Netlify)
 
 1. API must listen on the network, e.g. `app.run(host='0.0.0.0', port=8000, debug=False)` in `tild_api.py`

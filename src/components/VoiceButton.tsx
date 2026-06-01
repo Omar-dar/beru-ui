@@ -4,6 +4,7 @@ interface Props {
   disabled?: boolean
   active?: boolean
   onClick: () => void
+  title?: string
 }
 
 const MicIcon = () => (
@@ -12,14 +13,14 @@ const MicIcon = () => (
   </svg>
 )
 
-const VoiceButton: React.FC<Props> = ({ disabled, active, onClick }) => (
+const VoiceButton: React.FC<Props> = ({ disabled, active, onClick, title = 'Voice chat' }) => (
   <button
     type="button"
     className={`composer-voice${active ? ' composer-voice--active' : ''}`}
     onClick={onClick}
     disabled={disabled}
     aria-label="Start voice chat"
-    title="Voice chat"
+    title={title}
   >
     <MicIcon />
   </button>

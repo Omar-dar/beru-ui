@@ -58,8 +58,14 @@ export const useChat = () => {
   const sendVoiceMessageRef = useRef<(audio: Blob) => Promise<void>>(async () => {})
 
   const recorder = useVoiceRecorder()
-  const voiceEnabled =
-    recorder.isSupported && (voiceCapabilities === null || voiceCapabilities.stt !== false)
+  const voiceSttAvailable =
+    voiceCapabilities === null || voiceCapabilities.stt !== false
+  const voiceDisabledHint =
+    !recorder.isSupported
+      ? recorder.supportReason
+      : !voiceSttAvailable
+        ? 'Voice input is not enabled on the server.'
+        : null
 
   const applySession = useCallback((response: ChatResponse) => {
     setActiveDocument(response.active_document ?? null)
@@ -86,13 +92,11 @@ export const useChat = () => {
     setVoiceMode('listening')
     setVoiceProcessing(false)
 
-    const started = await recorder.startRecording(blob => {
+    const result = await recorder.startRecording(blob => {
       void sendVoiceMessageRef.current(blob)
     })
-    if (!started) {
-      setVoiceError(
-        recorder.recorderError || 'Could not restart microphone. Tap ✕ to close.'
-      )
+    if (!result.ok) {
+      setVoiceError(result.error)
     }
   }, [recorder])
 
@@ -265,14 +269,30 @@ export const useChat = () => {
     setVoiceSessionOpen(true)
     setVoiceMode('listening')
 
-    const started = await recorder.startRecording(blob => {
+    if (!voiceSttAvailable) {
+      setVoiceError('Voice input is not enabled on the server.')
+      return
+    }
+
+    if (!recorder.isSupported) {
+      setVoiceError(recorder.supportReason ?? 'Voice is not available on this device.')
+      return
+    }
+
+    const result = await recorder.startRecording(blob => {
       void sendVoiceMessageRef.current(blob)
     })
-    if (!started) {
-      voiceSessionOpenRef.current = false
-      setVoiceSessionOpen(false)
+    if (!result.ok) {
+      setVoiceError(result.error)
     }
-  }, [voiceProcessing, loading, uploading, voiceSessionOpen, recorder])
+  }, [
+    voiceProcessing,
+    loading,
+    uploading,
+    voiceSessionOpen,
+    recorder,
+    voiceSttAvailable,
+  ])
 
   const rejectInvalidPdf = useCallback(() => {
     setUploadError('Only PDF files are supported.')
@@ -369,7 +389,7 @@ export const useChat = () => {
     activeDocument,
     showSuggestedPrompts,
     suggestedPrompts: SUGGESTED_PROMPTS,
-    voiceEnabled,
+    voiceDisabledHint,
     voiceSessionOpen,
     voiceMode,
     voiceStatusText,

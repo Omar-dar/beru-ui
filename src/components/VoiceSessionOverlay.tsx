@@ -51,11 +51,13 @@ const VoiceSessionOverlay: React.FC<Props> = ({
         )}
 
         <p className="voice-overlay-hint">
-          {mode === 'listening'
-            ? 'Speak in any language — pause when done. Say goodbye or tap ✕ to end.'
-            : mode === 'speaking'
-              ? 'Tild is speaking…'
-              : 'Transcribing & thinking…'}
+          {error
+            ? 'Fix the issue above, then tap the mic again or close.'
+            : mode === 'listening'
+              ? 'Speak in any language — pause when done. Say goodbye or tap ✕ to end.'
+              : mode === 'speaking'
+                ? 'Tild is speaking…'
+                : 'Transcribing & thinking…'}
         </p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { extensionForAudioBlob } from '../utils/voiceSupport'
 import {
   ChatRequest,
   ChatResponse,
@@ -103,7 +104,7 @@ export const voiceChat = async (
   }
 ): Promise<VoiceChatResponse> => {
   const formData = new FormData()
-  const ext = audio.type.includes('webm') ? 'webm' : audio.type.includes('wav') ? 'wav' : 'webm'
+  const ext = extensionForAudioBlob(audio)
   formData.append('audio', audio, `recording.${ext}`)
   if (options?.document_id) {
     formData.append('document_id', options.document_id)

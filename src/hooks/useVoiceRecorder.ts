@@ -1,14 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-
-const pickMimeType = (): string => {
-  const types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/wav']
-  for (const type of types) {
-    if (MediaRecorder.isTypeSupported(type)) {
-      return type
-    }
-  }
-  return ''
-}
+import {
+  getVoiceSupportInfo,
+  microphoneErrorMessage,
+  pickRecordingMimeType,
+} from '../utils/voiceSupport'
 
 const SPEECH_THRESHOLD = 0.035
 const SILENCE_DURATION_MS = 1500
@@ -30,10 +25,8 @@ export const useVoiceRecorder = () => {
   const autoStopRef = useRef(false)
   const onAutoStopRef = useRef<((blob: Blob) => void) | null>(null)
 
-  const isSupported =
-    typeof navigator !== 'undefined' &&
-    !!navigator.mediaDevices?.getUserMedia &&
-    typeof MediaRecorder !== 'undefined'
+  const support = getVoiceSupportInfo()
+  const isSupported = support.supported
 
   const stopAnalyser = useCallback(() => {
     if (rafRef.current) {
@@ -75,7 +68,7 @@ export const useVoiceRecorder = () => {
       }
 
       recorder.onstop = () => {
-        const type = recorder.mimeType || 'audio/webm'
+        const type = recorder.mimeType || pickRecordingMimeType() || 'audio/mp4'
         const blob = new Blob(chunksRef.current, { type })
         mediaRecorderRef.current = null
         stopStream()
@@ -97,65 +90,85 @@ export const useVoiceRecorder = () => {
   }, [stopRecordingInternal])
 
   const startLevelMonitor = useCallback(
-    (stream: MediaStream, recordStart: number) => {
-      const audioContext = new AudioContext()
-      audioContextRef.current = audioContext
-      const source = audioContext.createMediaStreamSource(stream)
-      const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 512
-      analyser.smoothingTimeConstant = 0.75
-      source.connect(analyser)
-      analyserRef.current = analyser
+    async (stream: MediaStream, recordStart: number) => {
+      try {
+        const AudioCtx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        if (!AudioCtx) return
 
-      const data = new Uint8Array(analyser.frequencyBinCount)
-      let hasSpeech = false
-      let silenceStart: number | null = null
+        const audioContext = new AudioCtx()
+        audioContextRef.current = audioContext
 
-      const tick = () => {
-        analyser.getByteTimeDomainData(data)
-        let sum = 0
-        for (let i = 0; i < data.length; i++) {
-          const sample = (data[i] - 128) / 128
-          sum += sample * sample
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume()
         }
-        const rms = Math.sqrt(sum / data.length)
-        const level = Math.min(1, rms * 4)
-        setAudioLevel(level)
 
-        const speaking = rms > SPEECH_THRESHOLD
-        setIsUserSpeaking(speaking)
-        const elapsed = Date.now() - recordStart
+        const source = audioContext.createMediaStreamSource(stream)
+        const analyser = audioContext.createAnalyser()
+        analyser.fftSize = 512
+        analyser.smoothingTimeConstant = 0.75
+        source.connect(analyser)
+        analyserRef.current = analyser
 
-        if (speaking) {
-          hasSpeech = true
-          silenceStart = null
-        } else if (hasSpeech && elapsed > MIN_RECORD_MS) {
-          if (!silenceStart) {
-            silenceStart = Date.now()
-          } else if (Date.now() - silenceStart >= SILENCE_DURATION_MS) {
+        const data = new Uint8Array(analyser.frequencyBinCount)
+        let hasSpeech = false
+        let silenceStart: number | null = null
+
+        const tick = () => {
+          if (!analyserRef.current) return
+
+          analyser.getByteTimeDomainData(data)
+          let sum = 0
+          for (let i = 0; i < data.length; i++) {
+            const sample = (data[i] - 128) / 128
+            sum += sample * sample
+          }
+          const rms = Math.sqrt(sum / data.length)
+          const level = Math.min(1, rms * 4)
+          setAudioLevel(level)
+
+          const speaking = rms > SPEECH_THRESHOLD
+          setIsUserSpeaking(speaking)
+          const elapsed = Date.now() - recordStart
+
+          if (speaking) {
+            hasSpeech = true
+            silenceStart = null
+          } else if (hasSpeech && elapsed > MIN_RECORD_MS) {
+            if (!silenceStart) {
+              silenceStart = Date.now()
+            } else if (Date.now() - silenceStart >= SILENCE_DURATION_MS) {
+              void triggerAutoStop()
+              return
+            }
+          }
+
+          if (elapsed > MAX_RECORD_MS) {
             void triggerAutoStop()
             return
           }
-        }
 
-        if (elapsed > MAX_RECORD_MS) {
-          void triggerAutoStop()
-          return
+          rafRef.current = requestAnimationFrame(tick)
         }
 
         rafRef.current = requestAnimationFrame(tick)
+      } catch {
+        /* Visual level meter is optional; recording still works without it */
       }
-
-      rafRef.current = requestAnimationFrame(tick)
     },
     [triggerAutoStop]
   )
 
   const startRecording = useCallback(
-    async (onAutoStop?: (blob: Blob) => void): Promise<boolean> => {
-      if (!isSupported) {
-        setRecorderError('Voice recording is not supported in this browser.')
-        return false
+    async (
+      onAutoStop?: (blob: Blob) => void
+    ): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const info = getVoiceSupportInfo()
+      if (!info.supported) {
+        const error = info.reason ?? 'Voice is not available on this device.'
+        setRecorderError(error)
+        return { ok: false, error }
       }
 
       try {
@@ -169,14 +182,20 @@ export const useVoiceRecorder = () => {
             noiseSuppression: true,
             autoGainControl: true,
           },
+          video: false,
         })
         streamRef.current = stream
         chunksRef.current = []
 
-        const mimeType = pickMimeType()
-        const recorder = mimeType
-          ? new MediaRecorder(stream, { mimeType })
-          : new MediaRecorder(stream)
+        const mimeType = pickRecordingMimeType()
+        let recorder: MediaRecorder
+        try {
+          recorder = mimeType
+            ? new MediaRecorder(stream, { mimeType })
+            : new MediaRecorder(stream)
+        } catch {
+          recorder = new MediaRecorder(stream)
+        }
 
         mediaRecorderRef.current = recorder
         recorder.ondataavailable = event => {
@@ -184,19 +203,27 @@ export const useVoiceRecorder = () => {
             chunksRef.current.push(event.data)
           }
         }
+        recorder.onerror = () => {
+          setRecorderError('Recording failed on this device. Try again or type your message.')
+        }
 
         const recordStart = Date.now()
-        recorder.start(200)
+        try {
+          recorder.start(250)
+        } catch {
+          recorder.start()
+        }
         setIsRecording(true)
-        startLevelMonitor(stream, recordStart)
-        return true
-      } catch {
-        setRecorderError('Microphone access denied or unavailable.')
+        void startLevelMonitor(stream, recordStart)
+        return { ok: true }
+      } catch (err) {
+        const error = microphoneErrorMessage(err)
+        setRecorderError(error)
         stopStream()
-        return false
+        return { ok: false, error }
       }
     },
-    [isSupported, startLevelMonitor, stopStream]
+    [startLevelMonitor, stopStream]
   )
 
   const stopRecording = useCallback(async (): Promise<Blob | null> => {
@@ -225,6 +252,7 @@ export const useVoiceRecorder = () => {
     isUserSpeaking,
     recorderError,
     isSupported,
+    supportReason: support.reason,
     startRecording,
     stopRecording,
     cancelRecording,

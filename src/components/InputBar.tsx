@@ -10,7 +10,7 @@ interface Props {
   loading: boolean
   uploading: boolean
   voiceProcessing?: boolean
-  voiceEnabled?: boolean
+  voiceDisabledHint?: string | null
   voiceSessionOpen?: boolean
   onVoiceClick?: () => void
   uploadError: string | null
@@ -39,7 +39,7 @@ const InputBar: React.FC<Props> = ({
   loading,
   uploading,
   voiceProcessing = false,
-  voiceEnabled = false,
+  voiceDisabledHint = null,
   voiceSessionOpen = false,
   onVoiceClick,
   uploadError,
@@ -128,11 +128,12 @@ const InputBar: React.FC<Props> = ({
               <AttachIcon />
             )}
           </button>
-          {voiceEnabled && onVoiceClick && (
+          {onVoiceClick && (
             <VoiceButton
               active={voiceSessionOpen}
               disabled={busy}
               onClick={onVoiceClick}
+              title={voiceDisabledHint ?? 'Voice chat'}
             />
           )}
           <textarea
