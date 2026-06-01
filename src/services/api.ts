@@ -8,7 +8,8 @@ import {
   VoiceChatResponse,
 } from '../types'
 
-export const API_URL = 'http://localhost:8000'
+export const API_URL =
+  process.env.REACT_APP_API_URL?.replace(/\/$/, '') || 'http://localhost:8000'
 
 type ApiErrorBody = {
   error?: string
