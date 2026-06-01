@@ -61,6 +61,7 @@ export interface ChatRequest {
   message: string
   new_chat?: boolean
   document_id?: string
+  session_id?: string
 }
 
 export interface VoiceCapabilities {

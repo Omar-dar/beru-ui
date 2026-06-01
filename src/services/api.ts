@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getTildSessionId } from '../utils/tildSession'
 import { extensionForAudioBlob } from '../utils/voiceSupport'
 import {
   ChatRequest,
@@ -11,6 +12,8 @@ import {
 
 export const API_URL =
   process.env.REACT_APP_API_URL?.replace(/\/$/, '') || 'http://localhost:8000'
+
+axios.defaults.headers.common['X-Tild-Session-Id'] = getTildSessionId()
 
 type ApiErrorBody = {
   error?: string
@@ -64,7 +67,11 @@ export const sendMessage = async (
   message: string,
   options?: { new_chat?: boolean; document_id?: string }
 ): Promise<ChatResponse> => {
-  const body: ChatRequest = { message, ...options }
+  const body: ChatRequest = {
+    message,
+    ...options,
+    session_id: getTildSessionId(),
+  }
   const response = await axios.post<ChatResponse>(`${API_URL}/chat`, body)
   return response.data
 }
@@ -112,6 +119,7 @@ export const voiceChat = async (
   if (options?.new_chat) {
     formData.append('new_chat', 'true')
   }
+  formData.append('session_id', getTildSessionId())
   const response = await axios.post<VoiceChatResponse>(`${API_URL}/voice/chat`, formData)
   return response.data
 }
