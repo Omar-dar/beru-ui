@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, KeyboardEvent, useEffect } from 'react'
 import SuggestedPrompts from './SuggestedPrompts'
 import VoiceButton from './VoiceButton'
+import { getMessageDirection } from '../utils/textDirection'
 interface Props {
   onSend: (message: string) => void
   onUpload: (file: File) => void
@@ -50,6 +51,7 @@ const InputBar: React.FC<Props> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const busy = loading || uploading || voiceProcessing || voiceSessionOpen
+  const inputDir = getMessageDirection(input)
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current
@@ -142,6 +144,8 @@ const InputBar: React.FC<Props> = ({
             placeholder="Message Tild…"
             disabled={busy}
             rows={1}
+            dir={inputDir}
+            lang={inputDir === 'rtl' ? 'ar' : undefined}
           />
           <button
             type="button"

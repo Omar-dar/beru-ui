@@ -13,6 +13,7 @@ import {
 import { isPdfFile } from '../utils/pdfFile'
 import { speakTildReply, stopSpeaking } from '../utils/speech'
 import { isGoodbyeMessage } from '../utils/voiceGoodbye'
+import { getMessageDirection } from '../utils/textDirection'
 import { useVoiceRecorder } from './useVoiceRecorder'
 import { VoiceOrbMode } from '../components/VoiceOrb'
 
@@ -32,6 +33,7 @@ const makeTildMessage = (
   content,
   timestamp: new Date(),
   language: response?.language,
+  text_direction: response?.text_direction,
   animate,
 })
 
@@ -146,6 +148,16 @@ export const useChat = () => {
         const response = await sendMessage(content, {
           document_id: documentId ?? activeDocument?.id,
         })
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === userMessage.id
+              ? {
+                  ...m,
+                  text_direction: getMessageDirection(content, response.language),
+                }
+              : m
+          )
+        )
         appendTildReply(response)
       } catch (err) {
         setError(
@@ -189,11 +201,14 @@ export const useChat = () => {
 
         const endingSession = isGoodbyeMessage(transcript)
 
+        const userLang = response.transcript_language || response.language
         const userMessage: Message = {
           id: Date.now().toString(),
           role: 'user',
           content: transcript,
           timestamp: new Date(),
+          language: userLang,
+          text_direction: getMessageDirection(transcript, userLang),
         }
 
         applySession(response)
