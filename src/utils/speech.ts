@@ -9,7 +9,7 @@ const speechLang = (lang: string): string => {
 }
 
 const stripMarkdown = (text: string): string =>
-  text.replace(/[#*_`>\[\]()]/g, '').trim()
+  text.replace(/[#*_`>[\]()]/g, '').trim()
 
 export const speakWithBrowser = (text: string, language: string): Promise<void> => {
   return new Promise((resolve, reject) => {
