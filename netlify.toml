@@ -1,0 +1,6 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+
+# REACT_APP_API_URL must be set in Netlify UI (Site configuration → Environment variables).
+# Production scope required. Use HTTPS (ngrok), not http://192.168.x.x — Safari blocks mixed content.
