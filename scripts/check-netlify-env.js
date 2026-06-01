@@ -9,6 +9,15 @@ if (!isNetlify) {
 
 const url = (process.env.REACT_APP_API_URL || '').trim().replace(/\/$/, '')
 
+if (/abc123\.ngrok/i.test(url) || url.includes('YOUR-NGROK') || url.includes('YOUR-SUBDOMAIN')) {
+  console.error(
+    `\n[Netlify build] REACT_APP_API_URL looks like a placeholder (${url}).\n` +
+      '  Run: ngrok http 8000\n' +
+      '  Copy the https://….ngrok-free.app URL from the Forwarding line into Netlify.\n',
+  )
+  process.exit(1)
+}
+
 if (!url) {
   console.error(
     '\n[Netlify build] REACT_APP_API_URL is not set.\n' +

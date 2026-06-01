@@ -28,6 +28,16 @@ export const getApiErrorMessage = (err: unknown, fallback: string): string => {
 
   if (!err.response) {
     if (err.code === 'ERR_NETWORK') {
+      if (
+        API_URL.includes('localhost') ||
+        API_URL.includes('127.0.0.1')
+      ) {
+        return (
+          'Cannot reach Tild: this build uses localhost, which only works on the Mac running the API. ' +
+          'On Netlify, set REACT_APP_API_URL to your Mac’s LAN IP or an HTTPS tunnel URL, redeploy, ' +
+          'and run python3 tild_api.py on the Mac.'
+        )
+      }
       return `Cannot reach Tild at ${API_URL}. Start the backend with: python3 tild_api.py`
     }
     return err.message || fallback
