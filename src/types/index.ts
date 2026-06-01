@@ -11,6 +11,8 @@ export interface Message {
   content: string
   timestamp: Date
   language?: string
+  /** From API when available; otherwise inferred from language/content */
+  text_direction?: 'ltr' | 'rtl'
   /** Reveal text progressively (new AI replies only) */
   animate?: boolean
   /** PDF uploaded by the user (shown in chat, not the input bar) */
@@ -34,6 +36,7 @@ export interface DocumentInfo {
 export interface ChatResponse {
   response: string
   language: string
+  text_direction?: 'ltr' | 'rtl'
   tone?: string
   source?: string
   user?: string
