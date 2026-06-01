@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, KeyboardEvent, useEffect } from 'react'
 import SuggestedPrompts from './SuggestedPrompts'
-
+import VoiceButton from './VoiceButton'
 interface Props {
   onSend: (message: string) => void
   onUpload: (file: File) => void
@@ -8,7 +8,12 @@ interface Props {
   onDismissSuggested?: () => void
   loading: boolean
   uploading: boolean
+  voiceProcessing?: boolean
+  voiceEnabled?: boolean
+  voiceSessionOpen?: boolean
+  onVoiceClick?: () => void
   uploadError: string | null
+  voiceError?: string | null
   suggestedPrompts?: string[]
   showSuggestedPrompts?: boolean
 }
@@ -32,14 +37,19 @@ const InputBar: React.FC<Props> = ({
   onDismissSuggested,
   loading,
   uploading,
+  voiceProcessing = false,
+  voiceEnabled = false,
+  voiceSessionOpen = false,
+  onVoiceClick,
   uploadError,
+  voiceError,
   suggestedPrompts = [],
   showSuggestedPrompts = false,
 }) => {
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const busy = loading || uploading
+  const busy = loading || uploading || voiceProcessing || voiceSessionOpen
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current
@@ -79,9 +89,9 @@ const InputBar: React.FC<Props> = ({
   return (
     <div className="composer-wrap">
       <div className="composer-inner">
-        {uploadError && (
+        {(uploadError || voiceError) && (
           <div className="upload-error" role="alert">
-            {uploadError}
+            {uploadError || voiceError}
           </div>
         )}
 
@@ -116,6 +126,13 @@ const InputBar: React.FC<Props> = ({
               <AttachIcon />
             )}
           </button>
+          {voiceEnabled && onVoiceClick && (
+            <VoiceButton
+              active={voiceSessionOpen}
+              disabled={busy}
+              onClick={onVoiceClick}
+            />
+          )}
           <textarea
             ref={textareaRef}
             className="composer-input"
@@ -136,11 +153,6 @@ const InputBar: React.FC<Props> = ({
             <SendIcon />
           </button>
         </div>
-        <p className="composer-hint">
-          {uploading
-            ? 'Indexing PDF…'
-            : 'Drop PDF anywhere · paperclip · Enter to send'}
-        </p>
       </div>
     </div>
   )

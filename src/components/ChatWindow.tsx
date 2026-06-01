@@ -6,10 +6,18 @@ import TypingIndicator from './TypingIndicator'
 interface Props {
   messages: Message[]
   loading: boolean
+  voiceProcessing?: boolean
+  voiceSessionOpen?: boolean
   error: string | null
 }
 
-const ChatWindow: React.FC<Props> = ({ messages, loading, error }) => {
+const ChatWindow: React.FC<Props> = ({
+  messages,
+  loading,
+  voiceProcessing = false,
+  voiceSessionOpen = false,
+  error,
+}) => {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -18,7 +26,9 @@ const ChatWindow: React.FC<Props> = ({ messages, loading, error }) => {
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages, loading])
+  }, [messages, loading, voiceProcessing])
+
+  const showThinking = (loading || voiceProcessing) && !voiceSessionOpen
 
   return (
     <div className="chat-scroll">
@@ -30,7 +40,7 @@ const ChatWindow: React.FC<Props> = ({ messages, loading, error }) => {
             onReveal={message.animate ? scrollToBottom : undefined}
           />
         ))}
-        {loading && (
+        {showThinking && (
           <div className="chat-row chat-row--assistant">
             <div className="chat-avatar" aria-hidden>
               T

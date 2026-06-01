@@ -2,6 +2,7 @@ import React from 'react'
 import ChatWindow from './components/ChatWindow'
 import InputBar from './components/InputBar'
 import PdfDropZone from './components/PdfDropZone'
+import VoiceSessionOverlay from './components/VoiceSessionOverlay'
 import { useChat } from './hooks/useChat'
 import './styles/chat.css'
 
@@ -10,11 +11,21 @@ const App: React.FC = () => {
     messages,
     loading,
     uploading,
+    voiceProcessing,
     error,
     uploadError,
+    voiceError,
     activeDocument,
     showSuggestedPrompts,
     suggestedPrompts,
+    voiceEnabled,
+    voiceSessionOpen,
+    voiceMode,
+    voiceStatusText,
+    audioLevel,
+    isUserSpeaking,
+    startVoiceSession,
+    closeVoiceSession,
     sendUserMessage,
     clearChat,
     uploadPdf,
@@ -22,39 +33,59 @@ const App: React.FC = () => {
     dismissSuggestedPrompts,
   } = useChat()
 
-  const busy = loading || uploading
+  const busy = loading || uploading || voiceProcessing
 
   return (
     <PdfDropZone
       onUpload={uploadPdf}
       onInvalidFile={rejectInvalidPdf}
-      disabled={busy}
+      disabled={busy || voiceSessionOpen}
     >
-    <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-brand">
-          <div className="app-header-logo" aria-hidden>
-            T
+      <div className="app-shell">
+        <header className="app-header">
+          <div className="app-header-brand">
+            <div className="app-header-logo" aria-hidden>
+              T
+            </div>
+            <span className="app-header-title">Tild</span>
           </div>
-          <span className="app-header-title">Tild</span>
-        </div>
-        <button type="button" className="app-header-btn" onClick={clearChat}>
-          New chat
-        </button>
-      </header>
-      <ChatWindow messages={messages} loading={loading} error={error} />
-      <InputBar
-        onSend={sendUserMessage}
-        onUpload={uploadPdf}
-        onSuggestedPrompt={sendUserMessage}
-        onDismissSuggested={dismissSuggestedPrompts}
-        loading={loading}
-        uploading={uploading}
-        uploadError={uploadError}
-        suggestedPrompts={suggestedPrompts}
-        showSuggestedPrompts={showSuggestedPrompts && !!activeDocument}
-      />
-    </div>
+          <button type="button" className="app-header-btn" onClick={clearChat}>
+            New chat
+          </button>
+        </header>
+        <ChatWindow
+          messages={messages}
+          loading={loading}
+          voiceProcessing={voiceProcessing}
+          voiceSessionOpen={voiceSessionOpen}
+          error={error}
+        />
+        <InputBar
+          onSend={sendUserMessage}
+          onUpload={uploadPdf}
+          onSuggestedPrompt={sendUserMessage}
+          onDismissSuggested={dismissSuggestedPrompts}
+          onVoiceClick={startVoiceSession}
+          loading={loading}
+          uploading={uploading}
+          voiceProcessing={voiceProcessing}
+          voiceEnabled={voiceEnabled}
+          voiceSessionOpen={voiceSessionOpen}
+          uploadError={uploadError}
+          voiceError={voiceSessionOpen ? null : voiceError}
+          suggestedPrompts={suggestedPrompts}
+          showSuggestedPrompts={showSuggestedPrompts && !!activeDocument}
+        />
+        <VoiceSessionOverlay
+          open={voiceSessionOpen}
+          mode={voiceMode}
+          audioLevel={audioLevel}
+          isUserSpeaking={isUserSpeaking}
+          statusText={voiceStatusText}
+          error={voiceError}
+          onClose={closeVoiceSession}
+        />
+      </div>
     </PdfDropZone>
   )
 }

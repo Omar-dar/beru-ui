@@ -1,13 +1,20 @@
-import { useState, useCallback, useEffect } from 'react'
-import { Message, ActiveDocument, ChatResponse } from '../types'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { Message, ActiveDocument, ChatResponse, VoiceCapabilities } from '../types'
 import {
   sendMessage,
   startChat,
   clearSession,
   uploadDocument,
+  voiceChat,
+  getVoiceCapabilities,
   getApiErrorMessage,
+  getVoiceChatErrorMessage,
 } from '../services/api'
 import { isPdfFile } from '../utils/pdfFile'
+import { speakTildReply, stopSpeaking } from '../utils/speech'
+import { isGoodbyeMessage } from '../utils/voiceGoodbye'
+import { useVoiceRecorder } from './useVoiceRecorder'
+import { VoiceOrbMode } from '../components/VoiceOrb'
 
 const SUGGESTED_PROMPTS = [
   'Summarize this document',
@@ -35,19 +42,68 @@ export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [voiceProcessing, setVoiceProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
   const [activeDocument, setActiveDocument] = useState<ActiveDocument | null>(null)
   const [showSuggestedPrompts, setShowSuggestedPrompts] = useState(false)
+  const [voiceCapabilities, setVoiceCapabilities] = useState<VoiceCapabilities | null>(null)
+
+  const [voiceSessionOpen, setVoiceSessionOpen] = useState(false)
+  const [voiceMode, setVoiceMode] = useState<VoiceOrbMode>('listening')
+  const voiceSessionOpenRef = useRef(false)
+  const sendVoiceMessageRef = useRef<(audio: Blob) => Promise<void>>(async () => {})
+
+  const recorder = useVoiceRecorder()
+  const voiceEnabled =
+    recorder.isSupported && (voiceCapabilities === null || voiceCapabilities.stt !== false)
 
   const applySession = useCallback((response: ChatResponse) => {
     setActiveDocument(response.active_document ?? null)
   }, [])
 
   useEffect(() => {
+    voiceSessionOpenRef.current = voiceSessionOpen
+  }, [voiceSessionOpen])
+
+  const closeVoiceSession = useCallback(() => {
+    stopSpeaking()
+    recorder.cancelRecording()
+    voiceSessionOpenRef.current = false
+    setVoiceSessionOpen(false)
+    setVoiceProcessing(false)
+    setVoiceError(null)
+    setVoiceMode('listening')
+  }, [recorder])
+
+  const resumeListening = useCallback(async () => {
+    if (!voiceSessionOpenRef.current) return
+
+    setVoiceError(null)
+    setVoiceMode('listening')
+    setVoiceProcessing(false)
+
+    const started = await recorder.startRecording(blob => {
+      void sendVoiceMessageRef.current(blob)
+    })
+    if (!started) {
+      setVoiceError(
+        recorder.recorderError || 'Could not restart microphone. Tap ✕ to close.'
+      )
+    }
+  }, [recorder])
+
+  useEffect(() => {
     const init = async () => {
       try {
-        const startRes = await startChat()
+        const [startRes, voiceCaps] = await Promise.all([
+          startChat(),
+          getVoiceCapabilities().catch(() => null),
+        ])
+        if (voiceCaps) {
+          setVoiceCapabilities(voiceCaps)
+        }
         applySession(startRes)
         setMessages([makeTildMessage(startRes.response, startRes)])
       } catch {
@@ -71,6 +127,8 @@ export const useChat = () => {
   const sendUserMessage = useCallback(
     async (content: string, documentId?: string) => {
       if (!content.trim()) return
+
+      stopSpeaking()
 
       const userMessage: Message = {
         id: Date.now().toString(),
@@ -99,6 +157,107 @@ export const useChat = () => {
     },
     [activeDocument?.id, appendTildReply]
   )
+
+  const sendVoiceMessage = useCallback(
+    async (audio: Blob) => {
+      if (!voiceSessionOpenRef.current) return
+
+      if (!audio.size) {
+        setVoiceError('No audio captured. Try again.')
+        await resumeListening()
+        return
+      }
+
+      stopSpeaking()
+      setVoiceProcessing(true)
+      setVoiceMode('processing')
+      setVoiceError(null)
+      setError(null)
+      setShowSuggestedPrompts(false)
+
+      try {
+        const response = await voiceChat(audio, {
+          document_id: activeDocument?.id,
+        })
+
+        const transcript = response.transcript?.trim()
+        if (!transcript) {
+          setVoiceError('Could not understand audio, try again')
+          await resumeListening()
+          return
+        }
+
+        const endingSession = isGoodbyeMessage(transcript)
+
+        const userMessage: Message = {
+          id: Date.now().toString(),
+          role: 'user',
+          content: transcript,
+          timestamp: new Date(),
+        }
+
+        applySession(response)
+        setMessages(prev => [
+          ...finalizeAnimating(prev),
+          userMessage,
+          makeTildMessage(response.response, response, true),
+        ])
+
+        setVoiceMode('speaking')
+        await speakTildReply(
+          response.response,
+          response.language || response.transcript_language || 'en',
+          voiceCapabilities?.tts_server !== false
+        )
+
+        if (endingSession) {
+          closeVoiceSession()
+          return
+        }
+
+        await resumeListening()
+      } catch (err) {
+        setVoiceError(getVoiceChatErrorMessage(err))
+        if (voiceSessionOpenRef.current) {
+          await resumeListening()
+        }
+      } finally {
+        if (voiceSessionOpenRef.current) {
+          setVoiceProcessing(false)
+        }
+      }
+    },
+    [
+      activeDocument?.id,
+      applySession,
+      voiceCapabilities?.tts_server,
+      closeVoiceSession,
+      resumeListening,
+    ]
+  )
+
+  useEffect(() => {
+    sendVoiceMessageRef.current = sendVoiceMessage
+  }, [sendVoiceMessage])
+
+  const startVoiceSession = useCallback(async () => {
+    if (voiceProcessing || loading || uploading || voiceSessionOpen) return
+
+    recorder.clearRecorderError()
+    setVoiceError(null)
+    stopSpeaking()
+    voiceSessionOpenRef.current = true
+    setVoiceSessionOpen(true)
+    setVoiceMode('listening')
+
+    const started = await recorder.startRecording(blob => {
+      void sendVoiceMessageRef.current(blob)
+    })
+    if (!started) {
+      voiceSessionOpenRef.current = false
+      setVoiceSessionOpen(false)
+    }
+  }, [voiceProcessing, loading, uploading, voiceSessionOpen, recorder])
 
   const rejectInvalidPdf = useCallback(() => {
     setUploadError('Only PDF files are supported.')
@@ -153,8 +312,10 @@ export const useChat = () => {
   )
 
   const clearChat = useCallback(async () => {
+    closeVoiceSession()
     setError(null)
     setUploadError(null)
+    setVoiceError(null)
     setShowSuggestedPrompts(false)
 
     try {
@@ -171,17 +332,36 @@ export const useChat = () => {
         setMessages([makeTildMessage('Hey! I am Tild. Who am I talking to?')])
       }
     }
-  }, [applySession])
+  }, [applySession, closeVoiceSession])
+
+  const voiceStatusText =
+    voiceMode === 'listening'
+      ? recorder.isUserSpeaking
+        ? 'Listening…'
+        : 'Speak now'
+      : voiceMode === 'processing'
+        ? 'Thinking…'
+        : 'Tild is speaking…'
 
   return {
     messages,
     loading,
     uploading,
+    voiceProcessing,
     error,
     uploadError,
+    voiceError: voiceError || recorder.recorderError,
     activeDocument,
     showSuggestedPrompts,
     suggestedPrompts: SUGGESTED_PROMPTS,
+    voiceEnabled,
+    voiceSessionOpen,
+    voiceMode,
+    voiceStatusText,
+    audioLevel: recorder.audioLevel,
+    isUserSpeaking: recorder.isUserSpeaking,
+    startVoiceSession,
+    closeVoiceSession,
     sendUserMessage,
     clearChat,
     uploadPdf,
