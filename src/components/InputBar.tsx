@@ -50,8 +50,19 @@ const InputBar: React.FC<Props> = ({
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const busy = loading || uploading || voiceProcessing || voiceSessionOpen
+  const inputDisabled = uploading || voiceProcessing || voiceSessionOpen
+  const busy = loading || inputDisabled
   const inputDir = getMessageDirection(input)
+
+  const focusInput = useCallback(() => {
+    textareaRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    if (!inputDisabled) {
+      focusInput()
+    }
+  }, [inputDisabled, focusInput])
 
   const adjustHeight = useCallback(() => {
     const el = textareaRef.current
@@ -71,6 +82,7 @@ const InputBar: React.FC<Props> = ({
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
+    focusInput()
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -143,7 +155,7 @@ const InputBar: React.FC<Props> = ({
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Message Beru…"
-            disabled={busy}
+            disabled={inputDisabled}
             rows={1}
             dir={inputDir}
             lang={inputDir === 'rtl' ? 'ar' : undefined}
