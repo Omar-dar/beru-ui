@@ -19,8 +19,8 @@
 /* Tablet and below */
 @media (max-width: 768px) {
   .app-header {
-    padding: 10px var(--tild-page-x) 10px var(--tild-page-x-right);
-    padding-top: calc(10px + var(--tild-page-top));
+    padding: 10px var(--beru-page-x) 10px var(--beru-page-x-right);
+    padding-top: calc(10px + var(--beru-page-top));
   }
 
   .app-header-title {
@@ -28,13 +28,13 @@
   }
 
   .app-header-btn {
-    min-height: var(--tild-touch-min);
+    min-height: var(--beru-touch-min);
     padding: 8px 12px;
     font-size: 12px;
   }
 
   .chat-messages {
-    padding: 12px var(--tild-page-x) 16px var(--tild-page-x-right);
+    padding: 12px var(--beru-page-x) 16px var(--beru-page-x-right);
   }
 
   .chat-row {
@@ -64,8 +64,8 @@
   }
 
   .composer-wrap {
-    padding: 10px var(--tild-page-x) calc(12px + var(--tild-page-bottom))
-      var(--tild-page-x-right);
+    padding: 10px var(--beru-page-x) calc(12px + var(--beru-page-bottom))
+      var(--beru-page-x-right);
   }
 
   .composer-box {
@@ -82,10 +82,10 @@
   .composer-send,
   .composer-voice,
   .composer-attach {
-    width: var(--tild-touch-min);
-    height: var(--tild-touch-min);
-    min-width: var(--tild-touch-min);
-    min-height: var(--tild-touch-min);
+    width: var(--beru-touch-min);
+    height: var(--beru-touch-min);
+    min-width: var(--beru-touch-min);
+    min-height: var(--beru-touch-min);
   }
 
   .composer-attach svg,
@@ -95,7 +95,7 @@
   }
 
   .suggested-prompt-chip {
-    min-height: var(--tild-touch-min);
+    min-height: var(--beru-touch-min);
     display: inline-flex;
     align-items: center;
   }
@@ -107,15 +107,15 @@
 
   .voice-overlay {
     padding: 16px;
-    padding-top: calc(16px + var(--tild-page-top));
-    padding-bottom: calc(16px + var(--tild-page-bottom));
+    padding-top: calc(16px + var(--beru-page-top));
+    padding-bottom: calc(16px + var(--beru-page-bottom));
   }
 
   .voice-overlay-close {
-    top: var(--tild-page-top);
+    top: var(--beru-page-top);
     right: 0;
-    width: var(--tild-touch-min);
-    height: var(--tild-touch-min);
+    width: var(--beru-touch-min);
+    height: var(--beru-touch-min);
   }
 
   .voice-orb-wrap {

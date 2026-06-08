@@ -56,7 +56,7 @@ const VoiceSessionOverlay: React.FC<Props> = ({
             : mode === 'listening'
               ? 'Speak in any language — pause when done. Say goodbye or tap ✕ to end.'
               : mode === 'speaking'
-                ? 'Tild is speaking…'
+                ? 'Beru is speaking…'
                 : 'Transcribing & thinking…'}
         </p>
       </div>

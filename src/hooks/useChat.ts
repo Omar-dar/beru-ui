@@ -11,7 +11,7 @@ import {
   getVoiceChatErrorMessage,
 } from '../services/api'
 import { isPdfFile } from '../utils/pdfFile'
-import { speakTildReply, stopSpeaking } from '../utils/speech'
+import { speakBeruReply, stopSpeaking } from '../utils/speech'
 import { isGoodbyeMessage } from '../utils/voiceGoodbye'
 import { getMessageDirection } from '../utils/textDirection'
 import { useVoiceRecorder } from './useVoiceRecorder'
@@ -23,13 +23,13 @@ const SUGGESTED_PROMPTS = [
   'What is this document about?',
 ]
 
-const makeTildMessage = (
+const makeBeruMessage = (
   content: string,
   response?: ChatResponse,
   animate = false
 ): Message => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-  role: 'tild',
+  role: 'beru',
   content,
   timestamp: new Date(),
   language: response?.language,
@@ -38,7 +38,7 @@ const makeTildMessage = (
 })
 
 const finalizeAnimating = (prev: Message[]): Message[] =>
-  prev.map(m => (m.role === 'tild' && m.animate ? { ...m, animate: false } : m))
+  prev.map(m => (m.role === 'beru' && m.animate ? { ...m, animate: false } : m))
 
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([])
@@ -111,20 +111,20 @@ export const useChat = () => {
           setVoiceCapabilities(voiceCaps)
         }
         applySession(startRes)
-        setMessages([makeTildMessage(startRes.response, startRes)])
+        setMessages([makeBeruMessage(startRes.response, startRes)])
       } catch {
-        setMessages([makeTildMessage('Hey! I am Tild. Who am I talking to?')])
+        setMessages([makeBeruMessage('Hey! I am Beru. Who am I talking to?')])
       }
     }
     init()
   }, [applySession])
 
-  const appendTildReply = useCallback(
+  const appendBeruReply = useCallback(
     (response: ChatResponse, animate = true) => {
       applySession(response)
       setMessages(prev => [
         ...finalizeAnimating(prev),
-        makeTildMessage(response.response, response, animate),
+        makeBeruMessage(response.response, response, animate),
       ])
     },
     [applySession]
@@ -162,16 +162,16 @@ export const useChat = () => {
               : m
           )
         )
-        appendTildReply(response)
+        appendBeruReply(response)
       } catch (err) {
         setError(
-          getApiErrorMessage(err, 'Could not connect to Tild. Make sure the server is running!')
+          getApiErrorMessage(err, 'Could not connect to Beru. Make sure the server is running!')
         )
       } finally {
         setLoading(false)
       }
     },
-    [activeDocument?.id, appendTildReply]
+    [activeDocument?.id, appendBeruReply]
   )
 
   const sendVoiceMessage = useCallback(
@@ -219,11 +219,11 @@ export const useChat = () => {
         setMessages(prev => [
           ...finalizeAnimating(prev),
           userMessage,
-          makeTildMessage(response.response, response, true),
+          makeBeruMessage(response.response, response, true),
         ])
 
         setVoiceMode('speaking')
-        await speakTildReply(
+        await speakBeruReply(
           response.response,
           response.language || response.transcript_language || 'en',
           voiceCapabilities?.tts_server !== false
@@ -330,7 +330,7 @@ export const useChat = () => {
         setMessages(prev => [
           ...finalizeAnimating(prev),
           uploadMessage,
-          makeTildMessage(response.message, undefined, true),
+          makeBeruMessage(response.message, undefined, true),
         ])
       } catch (err) {
         setUploadError(
@@ -356,15 +356,15 @@ export const useChat = () => {
     try {
       const response = await clearSession()
       applySession(response)
-      setMessages([makeTildMessage(response.response, response)])
+      setMessages([makeBeruMessage(response.response, response)])
     } catch {
       try {
         const response = await startChat()
         applySession(response)
-        setMessages([makeTildMessage(response.response, response)])
+        setMessages([makeBeruMessage(response.response, response)])
       } catch {
         setActiveDocument(null)
-        setMessages([makeTildMessage('Hey! I am Tild. Who am I talking to?')])
+        setMessages([makeBeruMessage('Hey! I am Beru. Who am I talking to?')])
       }
     }
   }, [applySession, closeVoiceSession])
@@ -376,7 +376,7 @@ export const useChat = () => {
         : 'Speak now'
       : voiceMode === 'processing'
         ? 'Thinking…'
-        : 'Tild is speaking…'
+        : 'Beru is speaking…'
 
   return {
     messages,

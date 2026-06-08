@@ -1,6 +1,6 @@
-const SESSION_KEY = 'tild_session_id'
+const SESSION_KEY = 'beru_session_id'
 
-export function getTildSessionId(): string {
+export function getBeruSessionId(): string {
   let id = localStorage.getItem(SESSION_KEY)
   if (!id) {
     id =

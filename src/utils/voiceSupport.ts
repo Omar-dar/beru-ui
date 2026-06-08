@@ -92,7 +92,7 @@ export const microphoneErrorMessage = (err: unknown): string => {
       case 'NotReadableError':
         return 'Microphone is in use by another app. Close other apps and try again.'
       case 'SecurityError':
-        return 'Microphone blocked for security. Open Tild with https:// (not http://).'
+        return 'Microphone blocked for security. Open Beru with https:// (not http://).'
       default:
         break
     }

@@ -45,9 +45,9 @@ const App: React.FC = () => {
         <header className="app-header">
           <div className="app-header-brand">
             <div className="app-header-logo" aria-hidden>
-              T
+              B
             </div>
-            <span className="app-header-title">Tild</span>
+            <span className="app-header-title">Beru</span>
           </div>
           <button type="button" className="app-header-btn" onClick={clearChat}>
             New chat

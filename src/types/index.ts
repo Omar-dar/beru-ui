@@ -7,7 +7,7 @@ export interface MessageAttachment {
 
 export interface Message {
   id: string
-  role: 'user' | 'tild'
+  role: 'user' | 'beru'
   content: string
   timestamp: Date
   language?: string

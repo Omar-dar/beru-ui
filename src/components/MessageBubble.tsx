@@ -43,7 +43,7 @@ const MessageBubble: React.FC<Props> = ({ message, onReveal }) => {
   return (
     <div className="chat-row chat-row--assistant">
       <div className="chat-avatar" aria-hidden>
-        T
+        B
       </div>
       <div className="chat-body">
         {message.animate ? (

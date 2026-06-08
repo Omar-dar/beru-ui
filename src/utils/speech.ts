@@ -49,8 +49,8 @@ const playAudioBuffer = (buffer: ArrayBuffer, mimeType: string): Promise<void> =
   })
 }
 
-/** Play Tild reply via POST /voice/speak (edge-tts MP3) or browser fallback */
-export const speakTildReply = async (
+/** Play Beru reply via POST /voice/speak (edge-tts MP3) or browser fallback */
+export const speakBeruReply = async (
   text: string,
   language: string,
   useServerTts: boolean

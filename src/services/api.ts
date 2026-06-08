@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getTildSessionId } from '../utils/tildSession'
+import { getBeruSessionId } from '../utils/beruSession'
 import { extensionForAudioBlob } from '../utils/voiceSupport'
 import {
   ChatRequest,
@@ -13,7 +13,7 @@ import {
 export const API_URL =
   process.env.REACT_APP_API_URL?.replace(/\/$/, '') || 'http://localhost:8000'
 
-axios.defaults.headers.common['X-Tild-Session-Id'] = getTildSessionId()
+axios.defaults.headers.common['X-Beru-Session-Id'] = getBeruSessionId()
 
 type ApiErrorBody = {
   error?: string
@@ -33,12 +33,12 @@ export const getApiErrorMessage = (err: unknown, fallback: string): string => {
         API_URL.includes('127.0.0.1')
       ) {
         return (
-          'Cannot reach Tild: this build uses localhost, which only works on the Mac running the API. ' +
+          'Cannot reach Beru: this build uses localhost, which only works on the Mac running the API. ' +
           'On Netlify, set REACT_APP_API_URL to your Mac’s LAN IP or an HTTPS tunnel URL, redeploy, ' +
-          'and run python3 tild_api.py on the Mac.'
+          'and run python3 beru_api.py on the Mac.'
         )
       }
-      return `Cannot reach Tild at ${API_URL}. Start the backend with: python3 tild_api.py`
+      return `Cannot reach Beru at ${API_URL}. Start the backend with: python3 beru_api.py`
     }
     return err.message || fallback
   }
@@ -80,7 +80,7 @@ export const sendMessage = async (
   const body: ChatRequest = {
     message,
     ...options,
-    session_id: getTildSessionId(),
+    session_id: getBeruSessionId(),
   }
   const response = await axios.post<ChatResponse>(`${API_URL}/chat`, body)
   return response.data
@@ -129,7 +129,7 @@ export const voiceChat = async (
   if (options?.new_chat) {
     formData.append('new_chat', 'true')
   }
-  formData.append('session_id', getTildSessionId())
+  formData.append('session_id', getBeruSessionId())
   const response = await axios.post<VoiceChatResponse>(`${API_URL}/voice/chat`, formData)
   return response.data
 }

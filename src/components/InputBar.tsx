@@ -142,7 +142,7 @@ const InputBar: React.FC<Props> = ({
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message Tild…"
+            placeholder="Message Beru…"
             disabled={busy}
             rows={1}
             dir={inputDir}
