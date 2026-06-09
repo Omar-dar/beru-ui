@@ -10,6 +10,16 @@ const SILENCE_DURATION_MS = 1500
 const MIN_RECORD_MS = 700
 const MAX_RECORD_MS = 90000
 
+export type StartRecordingOptions = {
+  onAutoStop?: (blob: Blob) => void
+  /** Fires when silence timeout stops recording, before the blob is ready */
+  onAutoStopPending?: () => void
+  /** Keep recording until manual stop (enrollment clips) */
+  disableAutoStop?: boolean
+  /** Rawer mic for voice profile enrollment */
+  enrollProfile?: boolean
+}
+
 export const useVoiceRecorder = () => {
   const [isRecording, setIsRecording] = useState(false)
   const [audioLevel, setAudioLevel] = useState(0)
@@ -24,6 +34,8 @@ export const useVoiceRecorder = () => {
   const rafRef = useRef<number>(0)
   const autoStopRef = useRef(false)
   const onAutoStopRef = useRef<((blob: Blob) => void) | null>(null)
+  const onAutoStopPendingRef = useRef<(() => void) | null>(null)
+  const disableAutoStopRef = useRef(false)
 
   const support = getVoiceSupportInfo()
   const isSupported = support.supported
@@ -76,6 +88,13 @@ export const useVoiceRecorder = () => {
         resolve(blob.size > 0 ? blob : null)
       }
 
+      if (recorder.state === 'recording') {
+        try {
+          recorder.requestData()
+        } catch {
+          /* optional */
+        }
+      }
       recorder.stop()
     })
   }, [stopStream])
@@ -83,9 +102,11 @@ export const useVoiceRecorder = () => {
   const triggerAutoStop = useCallback(async () => {
     if (autoStopRef.current || !mediaRecorderRef.current) return
     autoStopRef.current = true
+    onAutoStopPendingRef.current?.()
     const blob = await stopRecordingInternal()
     onAutoStopRef.current?.(blob ?? new Blob())
     onAutoStopRef.current = null
+    onAutoStopPendingRef.current = null
     autoStopRef.current = false
   }, [stopRecordingInternal])
 
@@ -135,7 +156,11 @@ export const useVoiceRecorder = () => {
           if (speaking) {
             hasSpeech = true
             silenceStart = null
-          } else if (hasSpeech && elapsed > MIN_RECORD_MS) {
+          } else if (
+            !disableAutoStopRef.current &&
+            hasSpeech &&
+            elapsed > MIN_RECORD_MS
+          ) {
             if (!silenceStart) {
               silenceStart = Date.now()
             } else if (Date.now() - silenceStart >= SILENCE_DURATION_MS) {
@@ -144,7 +169,7 @@ export const useVoiceRecorder = () => {
             }
           }
 
-          if (elapsed > MAX_RECORD_MS) {
+          if (!disableAutoStopRef.current && elapsed > MAX_RECORD_MS) {
             void triggerAutoStop()
             return
           }
@@ -162,8 +187,10 @@ export const useVoiceRecorder = () => {
 
   const startRecording = useCallback(
     async (
-      onAutoStop?: (blob: Blob) => void
+      options?: StartRecordingOptions | ((blob: Blob) => void)
     ): Promise<{ ok: true } | { ok: false; error: string }> => {
+      const normalized: StartRecordingOptions =
+        typeof options === 'function' ? { onAutoStop: options } : (options ?? {})
       const info = getVoiceSupportInfo()
       if (!info.supported) {
         const error = info.reason ?? 'Voice is not available on this device.'
@@ -173,15 +200,23 @@ export const useVoiceRecorder = () => {
 
       try {
         setRecorderError(null)
-        onAutoStopRef.current = onAutoStop ?? null
+        onAutoStopRef.current = normalized.onAutoStop ?? null
+        onAutoStopPendingRef.current = normalized.onAutoStopPending ?? null
         autoStopRef.current = false
+        disableAutoStopRef.current = normalized.disableAutoStop ?? false
 
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-          },
+          audio: normalized.enrollProfile
+            ? {
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: true,
+              }
+            : {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+              },
           video: false,
         })
         streamRef.current = stream
@@ -228,11 +263,13 @@ export const useVoiceRecorder = () => {
 
   const stopRecording = useCallback(async (): Promise<Blob | null> => {
     onAutoStopRef.current = null
+    onAutoStopPendingRef.current = null
     return stopRecordingInternal()
   }, [stopRecordingInternal])
 
   const cancelRecording = useCallback(() => {
     onAutoStopRef.current = null
+    onAutoStopPendingRef.current = null
     autoStopRef.current = true
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') {
@@ -246,6 +283,17 @@ export const useVoiceRecorder = () => {
     autoStopRef.current = false
   }, [stopStream])
 
+  const resumeAudioContext = useCallback(async () => {
+    const ctx = audioContextRef.current
+    if (ctx?.state === 'suspended') {
+      try {
+        await ctx.resume()
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [])
+
   return {
     isRecording,
     audioLevel,
@@ -257,5 +305,6 @@ export const useVoiceRecorder = () => {
     stopRecording,
     cancelRecording,
     clearRecorderError: () => setRecorderError(null),
+    resumeAudioContext,
   }
 }

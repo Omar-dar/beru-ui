@@ -1,4 +1,10 @@
 import { speakTextOnServer } from '../services/api'
+import {
+  attachTtsAnalyser,
+  startSyntheticTtsLevel,
+  stopSyntheticTtsLevel,
+  stopTtsLevelMonitor,
+} from './ttsAudioLevel'
 
 let activeAudio: HTMLAudioElement | null = null
 
@@ -21,10 +27,31 @@ export const speakWithBrowser = (text: string, language: string): Promise<void> 
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = speechLang(language)
     utterance.rate = 1
-    utterance.onend = () => resolve()
-    utterance.onerror = () => reject(new Error('Speech failed'))
+    startSyntheticTtsLevel()
+    utterance.onend = () => {
+      stopSyntheticTtsLevel()
+      resolve()
+    }
+    utterance.onerror = () => {
+      stopSyntheticTtsLevel()
+      reject(new Error('Speech failed'))
+    }
     window.speechSynthesis.speak(utterance)
   })
+}
+
+const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes.buffer
+}
+
+export interface EmbeddedVoiceAudio {
+  base64: string
+  mimeType: string
 }
 
 const playAudioBuffer = (buffer: ArrayBuffer, mimeType: string): Promise<void> => {
@@ -32,12 +59,15 @@ const playAudioBuffer = (buffer: ArrayBuffer, mimeType: string): Promise<void> =
     const url = URL.createObjectURL(new Blob([buffer], { type: mimeType }))
     const audio = new Audio(url)
     activeAudio = audio
+    attachTtsAnalyser(audio)
     audio.onended = () => {
+      stopTtsLevelMonitor()
       URL.revokeObjectURL(url)
       if (activeAudio === audio) activeAudio = null
       resolve()
     }
     audio.onerror = () => {
+      stopTtsLevelMonitor()
       URL.revokeObjectURL(url)
       if (activeAudio === audio) activeAudio = null
       reject(new Error('Audio playback failed'))
@@ -49,14 +79,25 @@ const playAudioBuffer = (buffer: ArrayBuffer, mimeType: string): Promise<void> =
   })
 }
 
-/** Play Beru reply via POST /voice/speak (edge-tts MP3) or browser fallback */
+/** Play Beru reply: embedded audio from /voice/chat, /voice/speak, or browser fallback */
 export const speakBeruReply = async (
   text: string,
   language: string,
-  useServerTts: boolean
+  useServerTts: boolean,
+  embeddedAudio?: EmbeddedVoiceAudio | null
 ): Promise<void> => {
   const plain = stripMarkdown(text)
   if (!plain) return
+
+  if (embeddedAudio?.base64) {
+    try {
+      const buffer = base64ToArrayBuffer(embeddedAudio.base64)
+      await playAudioBuffer(buffer, embeddedAudio.mimeType || 'audio/mpeg')
+      return
+    } catch {
+      /* fall through to server/browser TTS */
+    }
+  }
 
   if (useServerTts) {
     try {
@@ -72,6 +113,8 @@ export const speakBeruReply = async (
 }
 
 export const stopSpeaking = (): void => {
+  stopTtsLevelMonitor()
+  stopSyntheticTtsLevel()
   if (activeAudio) {
     activeAudio.pause()
     activeAudio.src = ''
