@@ -2,7 +2,14 @@
   "name": "beru-ui",
   "version": "0.1.0",
   "private": true,
+  "homepage": "./",
+  "main": "electron/main.js",
   "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -20,11 +27,66 @@
     "typescript": "^4.9.5",
     "web-vitals": "^2.1.4"
   },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^35.1.5",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.3",
+    "workbox-build": "^7.3.0"
+  },
   "scripts": {
     "start": "react-scripts start",
-    "build": "node scripts/check-netlify-env.js && react-scripts build",
+    "build": "npm run build:web",
+    "build:web": "node scripts/check-netlify-env.js && react-scripts build && node scripts/generate-sw.js",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "electron:dev": "concurrently -k \"cross-env BROWSER=none npm start\" \"wait-on tcp:3000 && cross-env ELECTRON_START_URL=http://localhost:3000 electron .\"",
+    "electron:pack": "npm run build:web && electron-builder --dir",
+    "electron:build": "npm run build:web && electron-builder",
+    "cap:sync": "npm run build:web && npx cap sync",
+    "cap:android": "npm run cap:sync && npx cap open android",
+    "cap:ios": "npm run cap:sync && npx cap open ios",
+    "cap:add:android": "npx cap add android",
+    "cap:add:ios": "npx cap add ios"
+  },
+  "build": {
+    "appId": "com.beru.app",
+    "productName": "Beru",
+    "copyright": "Copyright © Beru",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "assets"
+    },
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/logo512.png"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "public/logo512.png",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "public/logo512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "eslintConfig": {
     "extends": [

@@ -16,6 +16,10 @@ Open [http://localhost:3000](http://localhost:3000).
 
 For Netlify / phone access, see [docs/DEPLOY.md](docs/DEPLOY.md).
 
+For **PWA, desktop (Electron), and mobile (Capacitor)** apps, see [docs/NATIVE_APPS.md](docs/NATIVE_APPS.md).
+
+For **web search + browser integration** (backend API), see [docs/BROWSER_INTEGRATION.md](docs/BROWSER_INTEGRATION.md).
+
 ## Available Scripts
 
 In the project directory, you can run:

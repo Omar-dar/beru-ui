@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Beru</string>
+    <string name="title_activity_main">Beru</string>
+    <string name="package_name">com.beru.app</string>
+    <string name="custom_url_scheme">com.beru.app</string>
+</resources>
