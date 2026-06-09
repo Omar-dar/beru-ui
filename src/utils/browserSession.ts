@@ -13,25 +13,37 @@ export const resolveBeruActivity = (response: ChatResponse): BeruActivity | null
 }
 
 export const shouldStartBrowserSession = (response: ChatResponse): boolean => {
+  if (response.browser_open) return true
+  if (response.client_actions?.some(a => a.type === 'open_url')) return true
   const activity = resolveBeruActivity(response)
   if (!activity || activity === 'idle') return false
   return (
     activity === 'searching' ||
     activity === 'browsing' ||
     activity === 'reading_page' ||
-    !!response.browser_url ||
-    (response.client_actions?.some(a => a.type === 'open_url') ?? false)
+    !!resolveOpenedUrl(response)
   )
 }
 
 export const shouldEndBrowserSession = (response: ChatResponse): boolean => {
-  if (response.activity === 'idle') return true
-  return (
+  if (
     response.client_actions?.some(
       a => a.type === 'focus_app' || a.type === 'close_browser'
-    ) ?? false
-  )
+    )
+  ) {
+    return true
+  }
+  if (response.activity === 'idle' && !response.browser_open) {
+    return true
+  }
+  return false
 }
+
+export const resolveOpenedUrl = (response: ChatResponse): string | undefined =>
+  response.opened_url ?? response.browser_url
+
+export const hadCloseTab = (response: ChatResponse): boolean =>
+  response.client_actions?.some(a => a.type === 'close_tab') ?? false
 
 export const browserStatusText = (
   activity: BeruActivity,

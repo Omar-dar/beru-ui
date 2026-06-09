@@ -1,5 +1,8 @@
 const { app, BrowserWindow, session, shell, screen, ipcMain } = require('electron')
 const path = require('path')
+const { registerBrowserManager } = require('./browserManager')
+
+let browserManager = null
 
 const isDev = !app.isPackaged
 const DEV_URL = process.env.ELECTRON_START_URL || 'http://localhost:3000'
@@ -144,13 +147,37 @@ const broadcastVoiceState = (state) => {
   }
 }
 
+const focusMainWindow = () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  if (!mainWindow.isVisible()) mainWindow.show()
+  mainWindow.show()
+  mainWindow.focus()
+  if (process.platform === 'win32') {
+    mainWindow.moveTop()
+  }
+}
+
 const registerBrowserIpc = () => {
-  ipcMain.handle('beru:open-url', async (_event, url) => {
-    if (!mainWindow || _event.sender !== mainWindow.webContents) return false
-    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return false
-    await shell.openExternal(url)
-    ensureOverlayOnTop()
-    return true
+  browserManager = registerBrowserManager(
+    () => mainWindow,
+    focusMainWindow,
+    () => ensureOverlayOnTop()
+  )
+
+  ipcMain.handle('beru:client-actions', async (event, actions) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+      return { browserOpen: false, currentTabUrl: null, panelVisible: false }
+    }
+    if (!Array.isArray(actions)) return browserManager.getState()
+    return browserManager.handleClientActions(actions)
+  })
+
+  ipcMain.handle('beru:browser-state', event => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+      return { browserOpen: false, currentTabUrl: null, panelVisible: false }
+    }
+    return browserManager.getState()
   })
 
   ipcMain.on('beru:focus-app', event => {
@@ -158,9 +185,7 @@ const registerBrowserIpc = () => {
     if (event.sender !== mainWindow.webContents && voiceOverlayWindow) {
       if (event.sender !== voiceOverlayWindow.webContents) return
     }
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.show()
-    mainWindow.focus()
+    browserManager.focusApp()
   })
 }
 
@@ -185,9 +210,7 @@ const registerVoiceOverlayIpc = () => {
   ipcMain.on('voice-overlay:activate', event => {
     if (!voiceOverlayWindow || event.sender !== voiceOverlayWindow.webContents) return
     if (!mainWindow || mainWindow.isDestroyed()) return
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.show()
-    mainWindow.focus()
+    focusMainWindow()
     mainWindow.webContents.send('voice-overlay:activate')
   })
 }
@@ -217,11 +240,16 @@ const createWindow = () => {
   })
 
   mainWindow.on('closed', () => {
+    if (browserManager) browserManager.destroy()
     mainWindow = null
     if (voiceOverlayWindow) {
       voiceOverlayWindow.close()
       voiceOverlayWindow = null
     }
+  })
+
+  mainWindow.on('resize', () => {
+    if (browserManager) browserManager.layoutBrowser()
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

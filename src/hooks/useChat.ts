@@ -26,10 +26,17 @@ import { logVoiceTiming } from '../utils/voiceTiming'
 import { VoiceOrbMode } from '../components/VoiceOrb'
 import { VoiceUILayout } from '../components/VoiceSessionOverlay'
 import { BeruActivity } from '../types'
-import { applyElectronClientActions, focusBeruApp } from '../native/electronBrowser'
+import {
+  applyElectronClientActions,
+  focusBeruApp,
+  focusBeruAppWhenReplying,
+  subscribeElectronBrowserState,
+} from '../native/electronBrowser'
 import {
   browserStatusText,
   floatOrbModeForBrowser,
+  hadCloseTab,
+  resolveOpenedUrl,
   shouldEndBrowserSession,
   shouldStartBrowserSession,
 } from '../utils/browserSession'
@@ -61,7 +68,7 @@ const makeBeruMessage = (
   language: response?.language,
   text_direction: response?.text_direction,
   animate,
-  browser_url: response?.browser_url,
+  browser_url: response ? resolveOpenedUrl(response) : undefined,
 })
 
 const finalizeAnimating = (prev: Message[]): Message[] =>
@@ -85,6 +92,9 @@ export const useChat = () => {
   const [voiceSessionOpen, setVoiceSessionOpen] = useState(false)
   const [voiceMode, setVoiceMode] = useState<VoiceOrbMode>('listening')
   const [browserSessionActive, setBrowserSessionActive] = useState(false)
+  const [browserOpen, setBrowserOpen] = useState(false)
+  const [browserPanelVisible, setBrowserPanelVisible] = useState(false)
+  const [currentTabUrl, setCurrentTabUrl] = useState<string | null>(null)
   const [browserActivity, setBrowserActivity] = useState<BeruActivity | null>(null)
   const [browserStatus, setBrowserStatus] = useState('')
   const [browserUrl, setBrowserUrl] = useState<string | null>(null)
@@ -127,33 +137,86 @@ export const useChat = () => {
 
   const endBrowserSession = useCallback(() => {
     setBrowserSessionActive(false)
+    setBrowserOpen(false)
+    setBrowserPanelVisible(false)
+    setCurrentTabUrl(null)
     setBrowserActivity(null)
     setBrowserStatus('')
     setBrowserUrl(null)
     focusBeruApp()
   }, [])
 
-  const applyBeruResponse = useCallback((response: ChatResponse) => {
-    applyElectronClientActions(response)
+  const syncBrowserUiFromResponse = useCallback(
+    (
+      response: ChatResponse,
+      electronState: {
+        browserOpen: boolean
+        currentTabUrl: string | null
+        panelVisible: boolean
+      } | null
+    ) => {
+      const tabUrl =
+        resolveOpenedUrl(response) ?? electronState?.currentTabUrl ?? null
+      const tabOpen = response.browser_open ?? electronState?.browserOpen ?? false
 
-    if (shouldEndBrowserSession(response)) {
-      endBrowserSession()
-      return
-    }
+      setBrowserOpen(tabOpen)
+      if (electronState) setBrowserPanelVisible(electronState.panelVisible)
+      setCurrentTabUrl(tabUrl)
+      if (tabUrl) setBrowserUrl(tabUrl)
+      else if (hadCloseTab(response) || !tabOpen) setBrowserUrl(null)
 
-    if (shouldStartBrowserSession(response)) {
-      const activity =
-        response.activity ??
-        (response.browser_url ? 'browsing' : 'searching')
-      setBrowserSessionActive(true)
-      setBrowserActivity(activity as BeruActivity)
-      setBrowserUrl(response.browser_url ?? null)
-      setBrowserStatus(browserStatusText(activity as BeruActivity, response))
-      if (voiceSessionOpenRef.current) {
-        void recorder.resumeAudioContext()
+      if (shouldEndBrowserSession(response)) {
+        setBrowserSessionActive(false)
+        setBrowserActivity(null)
+        setBrowserStatus('')
+        setBrowserOpen(tabOpen)
+        if (!tabOpen) {
+          setBrowserUrl(null)
+          setCurrentTabUrl(null)
+        }
+        focusBeruApp()
+        return
       }
-    }
-  }, [endBrowserSession, recorder])
+
+      if (shouldStartBrowserSession(response) || tabOpen) {
+        const activity =
+          response.activity ??
+          (tabUrl ? 'browsing' : 'searching')
+        setBrowserSessionActive(true)
+        setBrowserActivity(activity as BeruActivity)
+        setBrowserStatus(browserStatusText(activity as BeruActivity, response))
+        if (voiceSessionOpenRef.current) {
+          void recorder.resumeAudioContext()
+        }
+      } else if (hadCloseTab(response) && !tabOpen) {
+        setBrowserSessionActive(false)
+        setBrowserActivity(null)
+        setBrowserStatus('')
+      }
+    },
+    [recorder]
+  )
+
+  const applyBeruResponse = useCallback(
+    async (response: ChatResponse) => {
+      const electronState = await applyElectronClientActions(response)
+      syncBrowserUiFromResponse(response, electronState)
+    },
+    [syncBrowserUiFromResponse]
+  )
+
+  useEffect(() => {
+    const unsub = subscribeElectronBrowserState(state => {
+      setBrowserOpen(state.browserOpen)
+      setBrowserPanelVisible(state.panelVisible)
+      setCurrentTabUrl(state.currentTabUrl)
+      if (state.currentTabUrl) setBrowserUrl(state.currentTabUrl)
+      if (!state.browserOpen) {
+        setCurrentTabUrl(null)
+      }
+    })
+    return () => unsub?.()
+  }, [])
 
   const closeVoiceSession = useCallback(() => {
     stopSpeaking()
@@ -244,11 +307,12 @@ export const useChat = () => {
     (response: ChatResponse, animate = true) => {
       applySession(response)
       applyAuthFromResponse(response)
-      applyBeruResponse(response)
+      void applyBeruResponse(response)
       setMessages(prev => [
         ...finalizeAnimating(prev),
         makeBeruMessage(response.response, response, animate),
       ])
+      focusBeruAppWhenReplying()
     },
     [applySession, applyAuthFromResponse, applyBeruResponse]
   )
@@ -349,12 +413,13 @@ export const useChat = () => {
 
         applySession(response)
         applyAuthFromResponse(response)
-        applyBeruResponse(response)
+        await applyBeruResponse(response)
         setMessages(prev => [
           ...finalizeAnimating(prev),
           userMessage,
           makeBeruMessage(response.response, response, true),
         ])
+        focusBeruAppWhenReplying()
 
         if (response.awaiting_voice_wake) {
           autoWakeStartedRef.current = false
@@ -506,6 +571,7 @@ export const useChat = () => {
           uploadMessage,
           makeBeruMessage(response.message, undefined, true),
         ])
+        focusBeruAppWhenReplying()
       } catch (err) {
         setUploadError(
           getApiErrorMessage(
@@ -640,6 +706,9 @@ export const useChat = () => {
     floatStatusText,
     floatOrbMode,
     browserSessionActive,
+    browserOpen,
+    browserPanelVisible,
+    currentTabUrl,
     browserUrl,
     browserActivity,
     returnToApp,

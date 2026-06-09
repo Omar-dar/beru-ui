@@ -14,7 +14,6 @@ interface Props {
   voiceSessionOpen?: boolean
   onVoiceClick?: () => void
   chatLocked?: boolean
-  chatLockedHint?: string | null
   inputPlaceholder?: string
   uploadError: string | null
   voiceError?: string | null
@@ -46,7 +45,6 @@ const InputBar: React.FC<Props> = ({
   voiceSessionOpen = false,
   onVoiceClick,
   chatLocked = false,
-  chatLockedHint = null,
   inputPlaceholder = 'Message Beru…',
   uploadError,
   voiceError,
@@ -109,12 +107,6 @@ const InputBar: React.FC<Props> = ({
   return (
     <div className="composer-wrap">
       <div className="composer-inner">
-        {chatLocked && chatLockedHint && (
-          <div className="composer-wake-hint" role="status">
-            {chatLockedHint}
-          </div>
-        )}
-
         {(uploadError || voiceError) && (
           <div className="upload-error" role="alert">
             {uploadError || voiceError}

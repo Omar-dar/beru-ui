@@ -4,10 +4,12 @@ import ChatWindow from './components/ChatWindow'
 import InputBar from './components/InputBar'
 import PdfDropZone from './components/PdfDropZone'
 import VoiceSessionOverlay from './components/VoiceSessionOverlay'
+import VoiceChatStage from './components/VoiceChatStage'
 import VoiceEnrollModal from './components/VoiceEnrollModal'
 import { useChat } from './hooks/useChat'
 import { useElectronVoiceOverlay } from './hooks/useElectronVoiceOverlay'
 import './styles/chat.css'
+import './styles/voice-stage.css'
 
 const App: React.FC = () => {
   const {
@@ -29,6 +31,7 @@ const App: React.FC = () => {
     floatStatusText,
     floatOrbMode,
     browserSessionActive,
+    browserPanelVisible,
     browserUrl,
     audioLevel,
     isUserSpeaking,
@@ -43,7 +46,6 @@ const App: React.FC = () => {
     authReady,
     chatUnlocked,
     voiceEnrollRequired,
-    awaitingVoiceWake,
     showEnrollModal,
     setShowEnrollModal,
     refreshVoiceAuth,
@@ -55,11 +57,6 @@ const App: React.FC = () => {
   }, [refreshVoiceAuth, setShowEnrollModal])
 
   const chatLocked = authReady && !chatUnlocked
-  const chatLockedHint = voiceEnrollRequired
-    ? 'Enroll your voice first (header: Enroll voice).'
-    : awaitingVoiceWake
-      ? 'Say "Beru", "Hey Beru", or "Wake up Beru" into the mic to unlock chat.'
-      : 'Use voice to unlock this session.'
   const inputPlaceholder = chatLocked
     ? 'Voice unlock required…'
     : 'Message Beru…'
@@ -89,7 +86,9 @@ const App: React.FC = () => {
   const busy = loading || uploading || voiceProcessing
   const voiceCompanion =
     voiceSessionOpen && voiceUILayout === 'companion' && !electronFloat
-  const showInAppVoiceOverlay = voiceSessionOpen && !electronFloat
+  const voiceIntegrated =
+    voiceSessionOpen && voiceUILayout === 'immersive' && !electronFloat
+  const showCompanionOverlay = voiceCompanion
 
   return (
     <>
@@ -100,7 +99,7 @@ const App: React.FC = () => {
         disabled={busy || voiceSessionOpen || chatLocked}
       >
         <div
-          className={`app-shell${voiceCompanion ? ' app-shell--voice-companion' : ''}${browserSessionActive ? ' app-shell--browser-active' : ''}`}
+          className={`app-shell${voiceCompanion ? ' app-shell--voice-companion' : ''}${voiceIntegrated ? ' app-shell--voice-integrated' : ''}${browserSessionActive ? ' app-shell--browser-active' : ''}${browserPanelVisible ? ' app-shell--browser-split' : ''}`}
         >
           <header className="app-header">
             <div className="app-header-brand">
@@ -135,13 +134,26 @@ const App: React.FC = () => {
               </button>
             </div>
           </header>
-          <ChatWindow
-            messages={messages}
-            loading={loading}
-            voiceProcessing={voiceProcessing}
-            voiceSessionOpen={voiceSessionOpen}
-            error={error}
-          />
+          <div className="chat-column">
+            {voiceIntegrated && (
+              <VoiceChatStage
+                mode={voiceMode}
+                audioLevel={audioLevel}
+                isUserSpeaking={isUserSpeaking}
+                statusText={voiceStatusText}
+                error={voiceError}
+                onClose={closeVoiceSession}
+              />
+            )}
+            <ChatWindow
+              messages={messages}
+              loading={loading}
+              voiceProcessing={voiceProcessing}
+              voiceSessionOpen={voiceSessionOpen}
+              voiceIntegrated={voiceIntegrated}
+              error={error}
+            />
+          </div>
           <InputBar
             onSend={sendUserMessage}
             onUpload={uploadPdf}
@@ -149,7 +161,6 @@ const App: React.FC = () => {
             onDismissSuggested={dismissSuggestedPrompts}
             onVoiceClick={startVoiceSession}
             chatLocked={chatLocked}
-            chatLockedHint={chatLocked ? chatLockedHint : null}
             inputPlaceholder={inputPlaceholder}
             loading={loading}
             uploading={uploading}
@@ -161,10 +172,10 @@ const App: React.FC = () => {
             suggestedPrompts={suggestedPrompts}
             showSuggestedPrompts={showSuggestedPrompts && !!activeDocument}
           />
-          {showInAppVoiceOverlay && (
+          {showCompanionOverlay && (
             <VoiceSessionOverlay
               open={voiceSessionOpen}
-              layout={voiceUILayout}
+              layout="companion"
               mode={voiceMode}
               audioLevel={audioLevel}
               isUserSpeaking={isUserSpeaking}

@@ -1,5 +1,21 @@
 /// <reference types="react-scripts" />
 
+interface ClientAction {
+  type: string
+  url?: string
+  reuse_tab?: boolean
+  site?: string
+  direction?: string
+  amount?: number
+  text?: string
+}
+
+interface ElectronBrowserState {
+  browserOpen: boolean
+  currentTabUrl: string | null
+  panelVisible: boolean
+}
+
 interface ElectronVoiceOverlayState {
   open: boolean
   mode: 'listening' | 'processing' | 'speaking' | 'searching'
@@ -25,8 +41,10 @@ interface Window {
       onActivate: (callback: () => void) => () => void
     }
     browser: {
-      openUrl: (url: string) => Promise<boolean>
+      handleClientActions: (actions: ClientAction[]) => Promise<ElectronBrowserState>
+      getState: () => Promise<ElectronBrowserState>
       focusApp: () => void
+      onState: (callback: (state: ElectronBrowserState) => void) => () => void
     }
   }
 }

@@ -1,33 +1,60 @@
-import { ChatResponse } from '../types'
+import { ChatResponse, ClientAction, ElectronBrowserState } from '../types'
 
-export const applyElectronClientActions = (response: ChatResponse): void => {
+export const isElectronBrowser = (): boolean =>
+  typeof window !== 'undefined' && !!window.electronAPI?.browser?.handleClientActions
+
+/** Run backend client_actions in order (Electron only). */
+export const handleElectronClientActions = async (
+  actions: ClientAction[]
+): Promise<ElectronBrowserState | null> => {
   const api = window.electronAPI?.browser
-  if (!api) return
+  if (!api?.handleClientActions || !actions.length) {
+    return api?.getState?.() ?? null
+  }
+  return api.handleClientActions(actions)
+}
 
-  for (const action of response.client_actions ?? []) {
-    if (action.type === 'open_url' && action.url) {
-      void api.openUrl(action.url)
-    }
-    if (action.type === 'focus_app') {
-      api.focusApp()
-    }
-    if (action.type === 'close_browser') {
-      api.focusApp()
-    }
+export const applyElectronClientActions = async (
+  response: ChatResponse
+): Promise<ElectronBrowserState | null> => {
+  if (!isElectronBrowser()) return null
+
+  const actions = response.client_actions ?? []
+  if (!actions.length) {
+    return window.electronAPI?.browser?.getState?.() ?? null
   }
 
-  const shouldOpen =
-    response.browser_url &&
-    response.open_in_browser !== false &&
-    !response.client_actions?.some(
-      a => a.type === 'open_url' && a.url === response.browser_url
-    )
-
-  if (shouldOpen && response.browser_url) {
-    void api.openUrl(response.browser_url)
-  }
+  return handleElectronClientActions(actions)
 }
 
 export const focusBeruApp = (): void => {
-  window.electronAPI?.browser?.focusApp()
+  window.electronAPI?.browser?.focusApp?.()
+}
+
+/** Bring Beru to the foreground when a new reply appears and the app is in the background. */
+export const focusBeruAppWhenReplying = (): void => {
+  if (typeof document === 'undefined') return
+
+  const backgrounded = document.hidden || !document.hasFocus()
+
+  if (window.electronAPI?.browser) {
+    if (backgrounded) {
+      focusBeruApp()
+    }
+    return
+  }
+
+  if (backgrounded) {
+    try {
+      window.focus()
+    } catch {
+      /* Browsers may block focus from a background tab */
+    }
+  }
+}
+
+export const subscribeElectronBrowserState = (
+  callback: (state: ElectronBrowserState) => void
+): (() => void) | undefined => {
+  return window.electronAPI?.browser?.onState?.(callback)
 }

@@ -42,15 +42,18 @@ It stays on top even when Chrome opens for search.
 - OR `client_actions` includes `focus_app` or `close_browser`
 - OR user clicks **Back to Beru** / ✕ on float widget
 
-### Client actions (Electron runs these)
+### Client actions (Electron runs these in order)
 
 | Action | UI does |
 |--------|---------|
-| `{ "type": "open_url", "url": "https://..." }` | Opens in system browser, keeps float on top |
-| `{ "type": "focus_app" }` | Focuses Beru main window |
-| `{ "type": "close_browser" }` | Focuses Beru (cannot close user's Chrome) |
+| `open_url` | Open URL in **your system browser** (Chrome, Edge, etc.) |
+| `close_tab` | Clears Beru browser session state (tab stays in your browser) |
+| `scroll` / `scroll_to_text` | Skipped in UI — backend scrapes via Playwright headless |
+| `focus_app` / `close_browser` | Focus Beru window, hide float widget |
 
-If `browser_url` is set and `open_in_browser` is not `false`, UI also opens that URL.
+**UI only runs `client_actions` from the API** — never builds Google search URLs locally.
+
+Display `opened_url` / `browser_url` as **Opened: …** chip in chat (not in TTS).
 
 ### Header button
 
@@ -176,7 +179,8 @@ def handle_done():
 | `src/native/electronBrowser.ts` | Run `open_url` / `focus_app` |
 | `src/hooks/useChat.ts` | Browser session state, apply response actions |
 | `src/hooks/useElectronVoiceOverlay.ts` | Float visible during browser session |
-| `electron/main.js` | `beru:open-url`, `beru:focus-app` IPC |
+| `electron/browserManager.js` | System browser via `openExternal` + `client_actions` |
+| `electron/main.js` | `beru:client-actions`, `beru:browser-state` IPC |
 | `src/App.tsx` | "Back to Beru" button |
 | `src/components/FloatingVoiceWidget.tsx` | URL + hint in float widget |
 

@@ -8,6 +8,7 @@ interface Props {
   loading: boolean
   voiceProcessing?: boolean
   voiceSessionOpen?: boolean
+  voiceIntegrated?: boolean
   error: string | null
 }
 
@@ -16,6 +17,7 @@ const ChatWindow: React.FC<Props> = ({
   loading,
   voiceProcessing = false,
   voiceSessionOpen = false,
+  voiceIntegrated = false,
   error,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -32,7 +34,7 @@ const ChatWindow: React.FC<Props> = ({
 
   return (
     <div className="chat-scroll">
-      <div className="chat-messages">
+      <div className={`chat-messages${voiceIntegrated ? ' chat-messages--voice' : ''}`}>
         {messages.map(message => (
           <MessageBubble
             key={message.id}

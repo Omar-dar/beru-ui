@@ -24,7 +24,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     },
   },
   browser: {
-    openUrl: url => ipcRenderer.invoke('beru:open-url', url),
+    handleClientActions: actions => ipcRenderer.invoke('beru:client-actions', actions),
+    getState: () => ipcRenderer.invoke('beru:browser-state'),
     focusApp: () => ipcRenderer.send('beru:focus-app'),
+    onState: callback => {
+      const handler = (_event, state) => callback(state)
+      ipcRenderer.on('beru:browser-state', handler)
+      return () => ipcRenderer.removeListener('beru:browser-state', handler)
+    },
   },
 })

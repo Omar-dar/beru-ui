@@ -24,11 +24,28 @@ export interface Message {
 /** What Beru is doing — drives float overlay + backend browser automation */
 export type BeruActivity = 'idle' | 'searching' | 'browsing' | 'reading_page'
 
-export type ClientActionType = 'open_url' | 'focus_app' | 'close_browser'
+export type ClientActionType =
+  | 'open_url'
+  | 'focus_app'
+  | 'close_browser'
+  | 'close_tab'
+  | 'scroll'
+  | 'scroll_to_text'
 
 export interface ClientAction {
   type: ClientActionType
   url?: string
+  reuse_tab?: boolean
+  site?: string
+  direction?: 'up' | 'down' | 'top' | 'bottom'
+  amount?: number
+  text?: string
+}
+
+export interface ElectronBrowserState {
+  browserOpen: boolean
+  currentTabUrl: string | null
+  panelVisible: boolean
 }
 
 export interface ChatResponse {
@@ -39,8 +56,10 @@ export interface ChatResponse {
   source?: string
   /** Preferred over `source` for UI + browser session */
   activity?: BeruActivity
-  /** URL Beru opened or is reading (show in chat + open in Electron) */
+  /** URL for UI label only (not TTS) */
   browser_url?: string
+  opened_url?: string
+  browser_open?: boolean
   /** Search query used (display only) */
   search_query?: string
   /** Page title after scrape (display only) */
