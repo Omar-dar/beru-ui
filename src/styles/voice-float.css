@@ -1,0 +1,140 @@
+/* Electron always-on-top floating voice widget — fully transparent */
+
+html.voice-overlay-window,
+body.voice-overlay-window {
+  background: transparent !important;
+  overflow: hidden !important;
+  margin: 0;
+  padding: 0;
+  width: 340px;
+  height: 108px;
+}
+
+html.voice-overlay-window #root {
+  background: transparent !important;
+  width: 340px;
+  height: 108px;
+  min-height: 0;
+  overflow: visible;
+}
+
+.voice-float-empty {
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.voice-float-root {
+  width: 340px;
+  height: 108px;
+  box-sizing: border-box;
+  padding: 8px 0 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  overflow: visible;
+  background: transparent;
+  pointer-events: none;
+}
+
+.beru-float-widget {
+  position: relative;
+  overflow: visible;
+  flex-shrink: 0;
+  pointer-events: auto;
+}
+
+.beru-float-widget__body {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: auto;
+  max-width: 340px;
+  box-sizing: border-box;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  overflow: visible;
+  cursor: pointer;
+  outline: none;
+}
+
+.beru-float-widget__orb-wrap {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.beru-float-widget__orb-wrap:hover {
+  filter: brightness(1.08);
+}
+
+.beru-float-widget__orb-wrap .voice-orb-wrap {
+  overflow: visible;
+}
+
+.beru-float-widget__meta {
+  flex: 1;
+  min-width: 0;
+  max-width: 220px;
+  padding-right: 22px;
+}
+
+.beru-float-widget__status {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f4f6ff;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+  text-shadow:
+    0 0 20px rgba(0, 0, 0, 0.9),
+    0 1px 3px rgba(0, 0, 0, 0.85),
+    0 0 8px rgba(99, 102, 241, 0.35);
+}
+
+.beru-float-widget__error {
+  margin: 3px 0 0;
+  font-size: 11px;
+  color: #fca5a5;
+  line-height: 1.35;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+.beru-float-widget__hint {
+  margin: 2px 0 0;
+  font-size: 9px;
+  color: rgba(200, 205, 230, 0.75);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+}
+
+.beru-float-widget__close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: rgba(220, 225, 245, 0.75);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8));
+}
+
+.beru-float-widget__close:hover {
+  color: #fff;
+}
