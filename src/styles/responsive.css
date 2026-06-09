@@ -1,6 +1,5 @@
 /* Responsive layout — phones, tablets, and large screens */
 
-/* Base: scrollable tables & code on narrow viewports */
 .markdown-body {
   overflow-wrap: anywhere;
 }
@@ -16,7 +15,15 @@
   -webkit-overflow-scrolling: touch;
 }
 
-/* Tablet and below */
+/* Room for companion voice orb in top-right */
+.app-shell--voice-companion .chat-scroll {
+  padding-top: 4px;
+}
+
+.app-shell--voice-companion .chat-messages {
+  padding-top: 88px;
+}
+
 @media (max-width: 768px) {
   .app-header {
     padding: 10px var(--beru-page-x) 10px var(--beru-page-x-right);
@@ -27,6 +34,10 @@
     font-size: 14px;
   }
 
+  .app-header-subtitle {
+    font-size: 9px;
+  }
+
   .app-header-btn {
     min-height: var(--beru-touch-min);
     padding: 8px 12px;
@@ -35,6 +46,10 @@
 
   .chat-messages {
     padding: 12px var(--beru-page-x) 16px var(--beru-page-x-right);
+  }
+
+  .app-shell--voice-companion .chat-messages {
+    padding-top: 80px;
   }
 
   .chat-row {
@@ -71,7 +86,7 @@
   .composer-box {
     gap: 6px;
     padding: 8px 8px 8px 12px;
-    border-radius: 20px;
+    border-radius: 18px;
   }
 
   .composer-input {
@@ -105,65 +120,48 @@
     border-radius: 12px;
   }
 
-  .voice-overlay {
-    padding: 16px;
-    padding-top: calc(16px + var(--beru-page-top));
-    padding-bottom: calc(16px + var(--beru-page-bottom));
+  .voice-session--immersive .voice-session-anchor {
+    top: 46%;
   }
 
-  .voice-overlay-close {
-    top: var(--beru-page-top);
-    right: 0;
+  .voice-session--companion .voice-session-anchor {
+    top: calc(10px + var(--beru-page-top));
+    right: var(--beru-page-x);
+  }
+
+  .voice-session--companion .voice-session-panel {
+    max-width: min(300px, calc(100vw - 24px));
+    padding: 10px 12px 10px 10px;
+    gap: 10px;
+  }
+
+  .voice-session-close {
     width: var(--beru-touch-min);
     height: var(--beru-touch-min);
   }
 
-  .voice-orb-wrap {
-    width: 160px;
-    height: 160px;
+  .voice-session--companion .voice-session-close {
+    width: 28px;
+    height: 28px;
   }
 
-  .voice-orb-glow--outer {
-    width: 160px;
-    height: 160px;
-  }
-
-  .voice-orb-glow--mid {
-    width: 120px;
-    height: 120px;
-  }
-
-  .voice-orb-core {
-    width: 88px;
-    height: 88px;
-  }
-
-  .voice-orb-ring--1 {
-    width: 108px;
-    height: 108px;
-  }
-
-  .voice-orb-ring--2 {
-    width: 138px;
-    height: 138px;
-  }
-
-  .voice-overlay-status {
+  .voice-session-status {
     font-size: 16px;
-    margin-top: 20px;
   }
 
-  .voice-overlay-hint {
+  .voice-session--companion .voice-session-status {
+    font-size: 13px;
+  }
+
+  .voice-session-hint {
     font-size: 12px;
-    padding: 0 8px;
   }
 }
 
-/* Small phones */
 @media (max-width: 480px) {
   .app-header-logo {
-    width: 26px;
-    height: 26px;
+    width: 30px;
+    height: 30px;
     font-size: 12px;
   }
 
@@ -220,28 +218,11 @@
     text-align: center;
   }
 
-  .voice-orb-wrap {
-    width: 140px;
-    height: 140px;
-  }
-
-  .voice-orb-glow--outer {
-    width: 140px;
-    height: 140px;
-  }
-
-  .voice-orb-glow--mid {
-    width: 105px;
-    height: 105px;
-  }
-
-  .voice-orb-core {
-    width: 76px;
-    height: 76px;
+  .app-shell--voice-companion .chat-messages {
+    padding-top: 72px;
   }
 }
 
-/* Very narrow (e.g. iPhone SE landscape issues) */
 @media (max-width: 360px) {
   .composer-box {
     padding-left: 10px;
@@ -250,9 +231,17 @@
   .app-header-btn {
     padding: 8px 10px;
   }
+
+  .voice-session--companion .voice-session-meta {
+    display: none;
+  }
+
+  .voice-session--companion .voice-session-panel {
+    padding: 8px;
+    gap: 0;
+  }
 }
 
-/* Large desktops — comfortable reading width */
 @media (min-width: 1200px) {
   .chat-messages,
   .composer-inner,
@@ -261,38 +250,17 @@
   }
 }
 
-/* Landscape phones: reduce vertical pressure */
 @media (max-height: 500px) and (orientation: landscape) {
-  .voice-overlay-panel {
-    padding: 16px 20px;
+  .voice-session--immersive .voice-session-anchor {
+    top: 50%;
   }
 
-  .voice-orb-wrap {
-    width: 120px;
-    height: 120px;
-  }
-
-  .voice-orb-glow--outer {
-    width: 120px;
-    height: 120px;
-  }
-
-  .voice-orb-glow--mid {
-    width: 90px;
-    height: 90px;
-  }
-
-  .voice-orb-core {
-    width: 64px;
-    height: 64px;
-  }
-
-  .voice-overlay-status {
+  .voice-session-status {
     margin-top: 12px;
     font-size: 14px;
   }
 
-  .voice-overlay-hint {
+  .voice-session-hint {
     display: none;
   }
 
@@ -301,19 +269,34 @@
   }
 }
 
-/* Prefer reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .chat-scroll {
     scroll-behavior: auto;
   }
 
-  .typing-dot,
-  .voice-orb-glow--outer,
-  .voice-orb-glow--mid,
-  .voice-orb-core,
-  .voice-orb-ring--1,
-  .voice-orb-ring--2,
-  .stream-cursor {
+  .chat-row,
+  .suggested-prompts,
+  .chat-error,
+  .voice-session--companion .voice-session-panel {
     animation: none !important;
+  }
+
+  .typing-dot,
+  .voice-orb-visual-stage,
+  .voice-orb-search-halo,
+  .stream-cursor,
+  .app-header-logo,
+  .app-header-logo::after,
+  .ambient-bg__mesh,
+  .ambient-bg__grid,
+  .ambient-bg__orb,
+  .composer-box:focus-within,
+  .composer-voice--active,
+  .voice-session-badge {
+    animation: none !important;
+  }
+
+  .voice-session-anchor {
+    transition: none !important;
   }
 }

@@ -46,20 +46,33 @@ const MessageBubble: React.FC<Props> = ({ message, onReveal }) => {
         B
       </div>
       <div className="chat-body">
-        {message.animate ? (
-          <AnimatedMarkdown
-            content={content}
-            language={message.language}
-            textDirection={message.text_direction}
-            onReveal={onReveal}
-          />
-        ) : (
-          <MarkdownContent
-            content={content}
-            language={message.language}
-            textDirection={message.text_direction}
-          />
-        )}
+        <div className="assistant-panel">
+          {message.browser_url && (
+            <a
+              className="chat-browser-link"
+              href={message.browser_url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Opened: {message.browser_url.replace(/^https?:\/\//, '').slice(0, 60)}
+              {message.browser_url.length > 68 ? '…' : ''}
+            </a>
+          )}
+          {message.animate ? (
+            <AnimatedMarkdown
+              content={content}
+              language={message.language}
+              textDirection={message.text_direction}
+              onReveal={onReveal}
+            />
+          ) : (
+            <MarkdownContent
+              content={content}
+              language={message.language}
+              textDirection={message.text_direction}
+            />
+          )}
+        </div>
       </div>
     </div>
   )
