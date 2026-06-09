@@ -13,6 +13,9 @@ interface Props {
   voiceDisabledHint?: string | null
   voiceSessionOpen?: boolean
   onVoiceClick?: () => void
+  chatLocked?: boolean
+  chatLockedHint?: string | null
+  inputPlaceholder?: string
   uploadError: string | null
   voiceError?: string | null
   suggestedPrompts?: string[]
@@ -42,6 +45,9 @@ const InputBar: React.FC<Props> = ({
   voiceDisabledHint = null,
   voiceSessionOpen = false,
   onVoiceClick,
+  chatLocked = false,
+  chatLockedHint = null,
+  inputPlaceholder = 'Message Beru…',
   uploadError,
   voiceError,
   suggestedPrompts = [],
@@ -50,8 +56,8 @@ const InputBar: React.FC<Props> = ({
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const inputDisabled = uploading || voiceProcessing || voiceSessionOpen
-  const busy = loading || inputDisabled
+  const inputDisabled = uploading || voiceProcessing || voiceSessionOpen || chatLocked
+  const busy = loading || uploading || voiceProcessing || voiceSessionOpen
   const inputDir = getMessageDirection(input)
 
   const focusInput = useCallback(() => {
@@ -103,6 +109,12 @@ const InputBar: React.FC<Props> = ({
   return (
     <div className="composer-wrap">
       <div className="composer-inner">
+        {chatLocked && chatLockedHint && (
+          <div className="composer-wake-hint" role="status">
+            {chatLockedHint}
+          </div>
+        )}
+
         {(uploadError || voiceError) && (
           <div className="upload-error" role="alert">
             {uploadError || voiceError}
@@ -130,7 +142,7 @@ const InputBar: React.FC<Props> = ({
             type="button"
             className="composer-attach"
             onClick={() => fileInputRef.current?.click()}
-            disabled={busy}
+            disabled={busy || chatLocked}
             aria-label="Upload PDF"
             title="Upload PDF"
           >
@@ -154,7 +166,7 @@ const InputBar: React.FC<Props> = ({
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message Beru…"
+            placeholder={inputPlaceholder}
             disabled={inputDisabled}
             rows={1}
             dir={inputDir}

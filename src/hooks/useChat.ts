@@ -1,5 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Message, ActiveDocument, ChatResponse, VoiceCapabilities } from '../types'
+import {
+  Message,
+  ActiveDocument,
+  ChatResponse,
+  VoiceCapabilities,
+  VoiceAuthState,
+} from '../types'
 import {
   sendMessage,
   startChat,
@@ -7,6 +13,7 @@ import {
   uploadDocument,
   voiceChat,
   getVoiceCapabilities,
+  getVoiceAuthStatus,
   getApiErrorMessage,
   getVoiceChatErrorMessage,
 } from '../services/api'
@@ -14,8 +21,27 @@ import { isPdfFile } from '../utils/pdfFile'
 import { speakBeruReply, stopSpeaking } from '../utils/speech'
 import { isGoodbyeMessage } from '../utils/voiceGoodbye'
 import { getMessageDirection } from '../utils/textDirection'
-import { useVoiceRecorder } from './useVoiceRecorder'
+import { useVoiceRecorder, StartRecordingOptions } from './useVoiceRecorder'
+import { logVoiceTiming } from '../utils/voiceTiming'
 import { VoiceOrbMode } from '../components/VoiceOrb'
+import { VoiceUILayout } from '../components/VoiceSessionOverlay'
+import { BeruActivity } from '../types'
+import { applyElectronClientActions, focusBeruApp } from '../native/electronBrowser'
+import {
+  browserStatusText,
+  floatOrbModeForBrowser,
+  shouldEndBrowserSession,
+  shouldStartBrowserSession,
+} from '../utils/browserSession'
+import {
+  authFromStatus,
+  defaultVoiceAuthState,
+  detectVoiceAuthFromStart,
+  isChatUnlocked,
+  mergeVoiceAuth,
+  needsVoiceEnroll,
+  needsVoiceWake,
+} from '../utils/voiceAuth'
 
 const SUGGESTED_PROMPTS = [
   'Summarize this document',
@@ -35,6 +61,7 @@ const makeBeruMessage = (
   language: response?.language,
   text_direction: response?.text_direction,
   animate,
+  browser_url: response?.browser_url,
 })
 
 const finalizeAnimating = (prev: Message[]): Message[] =>
@@ -51,11 +78,19 @@ export const useChat = () => {
   const [activeDocument, setActiveDocument] = useState<ActiveDocument | null>(null)
   const [showSuggestedPrompts, setShowSuggestedPrompts] = useState(false)
   const [voiceCapabilities, setVoiceCapabilities] = useState<VoiceCapabilities | null>(null)
+  const [voiceAuth, setVoiceAuth] = useState<VoiceAuthState>(defaultVoiceAuthState)
+  const [authReady, setAuthReady] = useState(false)
+  const [showEnrollModal, setShowEnrollModal] = useState(false)
 
   const [voiceSessionOpen, setVoiceSessionOpen] = useState(false)
   const [voiceMode, setVoiceMode] = useState<VoiceOrbMode>('listening')
+  const [browserSessionActive, setBrowserSessionActive] = useState(false)
+  const [browserActivity, setBrowserActivity] = useState<BeruActivity | null>(null)
+  const [browserStatus, setBrowserStatus] = useState('')
+  const [browserUrl, setBrowserUrl] = useState<string | null>(null)
   const voiceSessionOpenRef = useRef(false)
   const sendVoiceMessageRef = useRef<(audio: Blob) => Promise<void>>(async () => {})
+  const autoWakeStartedRef = useRef(false)
 
   const recorder = useVoiceRecorder()
   const voiceSttAvailable =
@@ -71,9 +106,54 @@ export const useChat = () => {
     setActiveDocument(response.active_document ?? null)
   }, [])
 
+  const applyAuthFromResponse = useCallback((response: ChatResponse) => {
+    setVoiceAuth(prev => mergeVoiceAuth(prev, response))
+  }, [])
+
+  const refreshVoiceAuth = useCallback(async () => {
+    const status = await getVoiceAuthStatus()
+    if (status) {
+      setVoiceAuth(authFromStatus(status))
+    }
+  }, [])
+
+  const chatUnlocked = isChatUnlocked(voiceAuth)
+  const voiceEnrollRequired = needsVoiceEnroll(voiceAuth)
+  const awaitingVoiceWake = needsVoiceWake(voiceAuth)
+
   useEffect(() => {
     voiceSessionOpenRef.current = voiceSessionOpen
   }, [voiceSessionOpen])
+
+  const endBrowserSession = useCallback(() => {
+    setBrowserSessionActive(false)
+    setBrowserActivity(null)
+    setBrowserStatus('')
+    setBrowserUrl(null)
+    focusBeruApp()
+  }, [])
+
+  const applyBeruResponse = useCallback((response: ChatResponse) => {
+    applyElectronClientActions(response)
+
+    if (shouldEndBrowserSession(response)) {
+      endBrowserSession()
+      return
+    }
+
+    if (shouldStartBrowserSession(response)) {
+      const activity =
+        response.activity ??
+        (response.browser_url ? 'browsing' : 'searching')
+      setBrowserSessionActive(true)
+      setBrowserActivity(activity as BeruActivity)
+      setBrowserUrl(response.browser_url ?? null)
+      setBrowserStatus(browserStatusText(activity as BeruActivity, response))
+      if (voiceSessionOpenRef.current) {
+        void recorder.resumeAudioContext()
+      }
+    }
+  }, [endBrowserSession, recorder])
 
   const closeVoiceSession = useCallback(() => {
     stopSpeaking()
@@ -85,6 +165,23 @@ export const useChat = () => {
     setVoiceMode('listening')
   }, [recorder])
 
+  const beginVoiceThinking = useCallback(() => {
+    stopSpeaking()
+    setVoiceMode('processing')
+    setVoiceProcessing(true)
+    setVoiceError(null)
+    setError(null)
+    setShowSuggestedPrompts(false)
+  }, [])
+
+  const voiceRecordingOptions = useCallback(
+    (): StartRecordingOptions => ({
+      onAutoStopPending: beginVoiceThinking,
+      onAutoStop: blob => void sendVoiceMessageRef.current(blob),
+    }),
+    [beginVoiceThinking]
+  )
+
   const resumeListening = useCallback(async () => {
     if (!voiceSessionOpenRef.current) return
 
@@ -92,47 +189,78 @@ export const useChat = () => {
     setVoiceMode('listening')
     setVoiceProcessing(false)
 
-    const result = await recorder.startRecording(blob => {
-      void sendVoiceMessageRef.current(blob)
-    })
-    if (!result.ok) {
+    const result = await recorder.startRecording(voiceRecordingOptions())
+    if (result.ok) {
+      await recorder.resumeAudioContext()
+    } else {
       setVoiceError(result.error)
     }
-  }, [recorder])
+  }, [recorder, voiceRecordingOptions])
 
   useEffect(() => {
     const init = async () => {
       try {
-        const [startRes, voiceCaps] = await Promise.all([
+        const [authStatus, startRes, voiceCaps] = await Promise.all([
+          getVoiceAuthStatus(),
           startChat(),
           getVoiceCapabilities().catch(() => null),
         ])
         if (voiceCaps) {
           setVoiceCapabilities(voiceCaps)
         }
+
+        let auth = defaultVoiceAuthState()
+        if (authStatus) {
+          auth = authFromStatus(authStatus)
+        } else if (detectVoiceAuthFromStart(startRes)) {
+          auth = mergeVoiceAuth(auth, {
+            voice_auth_enabled: true,
+            voice_enrolled: startRes.voice_enrolled,
+            awaiting_voice_wake: startRes.awaiting_voice_wake,
+            session_identified: startRes.session_identified,
+            is_owner: startRes.is_owner,
+            voice_verified: startRes.voice_verified,
+          })
+        }
+
+        setVoiceAuth(auth)
         applySession(startRes)
+        applyAuthFromResponse(startRes)
         setMessages([makeBeruMessage(startRes.response, startRes)])
+
+        if (needsVoiceEnroll(auth)) {
+          setShowEnrollModal(true)
+        }
       } catch {
         setMessages([makeBeruMessage('Hey! I am Beru. Who am I talking to?')])
+      } finally {
+        setAuthReady(true)
       }
     }
     init()
-  }, [applySession])
+  }, [applySession, applyAuthFromResponse])
 
   const appendBeruReply = useCallback(
     (response: ChatResponse, animate = true) => {
       applySession(response)
+      applyAuthFromResponse(response)
+      applyBeruResponse(response)
       setMessages(prev => [
         ...finalizeAnimating(prev),
         makeBeruMessage(response.response, response, animate),
       ])
     },
-    [applySession]
+    [applySession, applyAuthFromResponse, applyBeruResponse]
   )
 
   const sendUserMessage = useCallback(
     async (content: string, documentId?: string) => {
       if (!content.trim()) return
+
+      if (!isChatUnlocked(voiceAuth)) {
+        setError('Use voice: say "Beru" or "Wake up Beru" into the mic.')
+        return
+      }
 
       stopSpeaking()
 
@@ -171,7 +299,7 @@ export const useChat = () => {
         setLoading(false)
       }
     },
-    [activeDocument?.id, appendBeruReply]
+    [activeDocument?.id, appendBeruReply, voiceAuth]
   )
 
   const sendVoiceMessage = useCallback(
@@ -180,31 +308,35 @@ export const useChat = () => {
 
       if (!audio.size) {
         setVoiceError('No audio captured. Try again.')
+        setVoiceMode('listening')
+        setVoiceProcessing(false)
         await resumeListening()
         return
       }
 
-      stopSpeaking()
-      setVoiceProcessing(true)
-      setVoiceMode('processing')
-      setVoiceError(null)
-      setError(null)
-      setShowSuggestedPrompts(false)
+      const useServerTts = voiceCapabilities?.tts_server !== false
 
       try {
         const response = await voiceChat(audio, {
           document_id: activeDocument?.id,
+          include_audio: useServerTts,
         })
+
+        logVoiceTiming(response.timing_ms)
+        if (response.audio_error) {
+          console.warn('[Beru voice] embedded TTS failed:', response.audio_error)
+        }
 
         const transcript = response.transcript?.trim()
         if (!transcript) {
           setVoiceError('Could not understand audio, try again')
+          setVoiceMode('listening')
+          setVoiceProcessing(false)
           await resumeListening()
           return
         }
 
         const endingSession = isGoodbyeMessage(transcript)
-
         const userLang = response.transcript_language || response.language
         const userMessage: Message = {
           id: Date.now().toString(),
@@ -216,17 +348,41 @@ export const useChat = () => {
         }
 
         applySession(response)
+        applyAuthFromResponse(response)
+        applyBeruResponse(response)
         setMessages(prev => [
           ...finalizeAnimating(prev),
           userMessage,
           makeBeruMessage(response.response, response, true),
         ])
 
-        setVoiceMode('speaking')
+        if (response.awaiting_voice_wake) {
+          autoWakeStartedRef.current = false
+        }
+
+        if (shouldEndBrowserSession(response)) {
+          setVoiceMode('speaking')
+        } else if (shouldStartBrowserSession(response)) {
+          setVoiceMode('searching')
+        } else {
+          setVoiceMode('speaking')
+        }
+        setVoiceProcessing(false)
+
+        const replyLang = response.language || response.transcript_language || 'en'
+        const embeddedAudio =
+          useServerTts && response.audio_base64
+            ? {
+                base64: response.audio_base64,
+                mimeType: response.audio_mime || 'audio/mpeg',
+              }
+            : null
+
         await speakBeruReply(
           response.response,
-          response.language || response.transcript_language || 'en',
-          voiceCapabilities?.tts_server !== false
+          replyLang,
+          useServerTts,
+          embeddedAudio
         )
 
         if (endingSession) {
@@ -237,12 +393,10 @@ export const useChat = () => {
         await resumeListening()
       } catch (err) {
         setVoiceError(getVoiceChatErrorMessage(err))
+        setVoiceMode('listening')
+        setVoiceProcessing(false)
         if (voiceSessionOpenRef.current) {
           await resumeListening()
-        }
-      } finally {
-        if (voiceSessionOpenRef.current) {
-          setVoiceProcessing(false)
         }
       }
     },
@@ -252,6 +406,8 @@ export const useChat = () => {
       voiceCapabilities?.tts_server,
       closeVoiceSession,
       resumeListening,
+      applyBeruResponse,
+      applyAuthFromResponse,
     ]
   )
 
@@ -261,6 +417,12 @@ export const useChat = () => {
 
   const startVoiceSession = useCallback(async () => {
     if (voiceProcessing || loading || uploading || voiceSessionOpen) return
+
+    if (voiceEnrollRequired) {
+      setShowEnrollModal(true)
+      setVoiceError('Enroll your voice first (Settings).')
+      return
+    }
 
     recorder.clearRecorderError()
     setVoiceError(null)
@@ -279,9 +441,7 @@ export const useChat = () => {
       return
     }
 
-    const result = await recorder.startRecording(blob => {
-      void sendVoiceMessageRef.current(blob)
-    })
+    const result = await recorder.startRecording(voiceRecordingOptions())
     if (!result.ok) {
       setVoiceError(result.error)
     }
@@ -292,7 +452,16 @@ export const useChat = () => {
     voiceSessionOpen,
     recorder,
     voiceSttAvailable,
+    voiceEnrollRequired,
+    voiceRecordingOptions,
   ])
+
+  useEffect(() => {
+    if (!authReady || !awaitingVoiceWake || voiceSessionOpen) return
+    if (autoWakeStartedRef.current) return
+    autoWakeStartedRef.current = true
+    void startVoiceSession()
+  }, [authReady, awaitingVoiceWake, voiceSessionOpen, startVoiceSession])
 
   const rejectInvalidPdf = useCallback(() => {
     setUploadError('Only PDF files are supported.')
@@ -302,6 +471,11 @@ export const useChat = () => {
     async (file: File) => {
       if (!isPdfFile(file)) {
         rejectInvalidPdf()
+        return
+      }
+
+      if (!isChatUnlocked(voiceAuth)) {
+        setUploadError('Use voice: say "Beru" or "Wake up Beru" into the mic.')
         return
       }
 
@@ -343,8 +517,43 @@ export const useChat = () => {
         setUploading(false)
       }
     },
-    [rejectInvalidPdf]
+    [rejectInvalidPdf, voiceAuth]
   )
+
+  const returnToApp = useCallback(() => {
+    endBrowserSession()
+    focusBeruApp()
+  }, [endBrowserSession])
+
+  const activateVoiceFromOverlay = useCallback(async () => {
+    focusBeruApp()
+    await recorder.resumeAudioContext()
+    if (voiceSessionOpenRef.current && voiceMode !== 'processing') {
+      if (!recorder.isRecording) {
+        await resumeListening()
+      }
+    }
+  }, [recorder, resumeListening, voiceMode])
+
+  useEffect(() => {
+    if (!voiceSessionOpen) return undefined
+
+    const onFocus = () => {
+      void recorder.resumeAudioContext()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+
+    const unsubActivate = window.electronAPI?.voiceOverlay?.onActivate?.(() => {
+      void activateVoiceFromOverlay()
+    })
+
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+      unsubActivate?.()
+    }
+  }, [voiceSessionOpen, recorder, activateVoiceFromOverlay])
 
   const clearChat = useCallback(async () => {
     closeVoiceSession()
@@ -353,30 +562,64 @@ export const useChat = () => {
     setVoiceError(null)
     setShowSuggestedPrompts(false)
 
+    autoWakeStartedRef.current = false
+
     try {
       const response = await clearSession()
       applySession(response)
+      applyAuthFromResponse(response)
       setMessages([makeBeruMessage(response.response, response)])
     } catch {
       try {
         const response = await startChat()
         applySession(response)
+        applyAuthFromResponse(response)
         setMessages([makeBeruMessage(response.response, response)])
       } catch {
         setActiveDocument(null)
         setMessages([makeBeruMessage('Hey! I am Beru. Who am I talking to?')])
       }
     }
-  }, [applySession, closeVoiceSession])
+  }, [applySession, applyAuthFromResponse, closeVoiceSession])
 
   const voiceStatusText =
-    voiceMode === 'listening'
-      ? recorder.isUserSpeaking
-        ? 'Listening…'
-        : 'Speak now'
-      : voiceMode === 'processing'
-        ? 'Thinking…'
-        : 'Beru is speaking…'
+    voiceMode === 'searching'
+      ? browserStatus || 'Searching the web…'
+      : voiceMode === 'listening'
+        ? recorder.isUserSpeaking
+          ? 'Listening…'
+          : awaitingVoiceWake
+            ? 'Say "Beru" or "Wake up Beru"'
+            : 'Speak now'
+        : voiceMode === 'processing'
+          ? 'Thinking…'
+          : 'Beru is speaking…'
+
+  const floatStatusText = (() => {
+    if (awaitingVoiceWake && voiceSessionOpen && voiceMode === 'listening') {
+      return 'Say "Beru" or "Wake up Beru"'
+    }
+    if (browserSessionActive && voiceSessionOpen && voiceMode === 'listening') {
+      return 'Listening. Tap orb if no reply'
+    }
+    if (browserSessionActive && !voiceSessionOpen) {
+      return browserStatus || 'Browsing…'
+    }
+    if (browserSessionActive) {
+      return browserStatus || voiceStatusText
+    }
+    return voiceStatusText
+  })()
+
+  const floatOrbMode: VoiceOrbMode =
+    browserSessionActive && !voiceSessionOpen
+      ? floatOrbModeForBrowser(browserActivity ?? 'searching')
+      : voiceMode
+
+  const voiceUILayout: VoiceUILayout =
+    voiceSessionOpen && voiceMode === 'listening' && !browserSessionActive
+      ? 'immersive'
+      : 'companion'
 
   return {
     messages,
@@ -392,7 +635,15 @@ export const useChat = () => {
     voiceDisabledHint,
     voiceSessionOpen,
     voiceMode,
+    voiceUILayout,
     voiceStatusText,
+    floatStatusText,
+    floatOrbMode,
+    browserSessionActive,
+    browserUrl,
+    browserActivity,
+    returnToApp,
+    activateVoiceFromOverlay,
     audioLevel: recorder.audioLevel,
     isUserSpeaking: recorder.isUserSpeaking,
     startVoiceSession,
@@ -402,5 +653,12 @@ export const useChat = () => {
     uploadPdf,
     rejectInvalidPdf,
     dismissSuggestedPrompts: () => setShowSuggestedPrompts(false),
+    authReady,
+    chatUnlocked,
+    voiceEnrollRequired,
+    awaitingVoiceWake,
+    showEnrollModal,
+    setShowEnrollModal,
+    refreshVoiceAuth,
   }
 }

@@ -8,6 +8,8 @@ import {
   UploadResponse,
   VoiceCapabilities,
   VoiceChatResponse,
+  VoiceAuthStatus,
+  VoiceEnrollResponse,
 } from '../types'
 
 export const API_URL =
@@ -113,11 +115,32 @@ export const getVoiceCapabilities = async (): Promise<VoiceCapabilities> => {
   return response.data
 }
 
+export const getVoiceAuthStatus = async (): Promise<VoiceAuthStatus | null> => {
+  try {
+    const response = await axios.get<VoiceAuthStatus>(`${API_URL}/voice/auth/status`)
+    return response.data
+  } catch {
+    return null
+  }
+}
+
+export const enrollVoice = async (clips: Blob[]): Promise<VoiceEnrollResponse> => {
+  const formData = new FormData()
+  for (const clip of clips) {
+    const ext = extensionForAudioBlob(clip)
+    formData.append('audio', clip, `enroll.${ext}`)
+  }
+  const response = await axios.post<VoiceEnrollResponse>(`${API_URL}/voice/enroll`, formData)
+  return response.data
+}
+
 export const voiceChat = async (
   audio: Blob,
   options?: {
     new_chat?: boolean
     document_id?: string
+    /** Request TTS audio in the same response (skips /voice/speak round trip) */
+    include_audio?: boolean
   }
 ): Promise<VoiceChatResponse> => {
   const formData = new FormData()
@@ -128,6 +151,9 @@ export const voiceChat = async (
   }
   if (options?.new_chat) {
     formData.append('new_chat', 'true')
+  }
+  if (options?.include_audio) {
+    formData.append('include_audio', 'true')
   }
   formData.append('session_id', getBeruSessionId())
   const response = await axios.post<VoiceChatResponse>(`${API_URL}/voice/chat`, formData)

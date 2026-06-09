@@ -57,7 +57,7 @@ export const getVoiceSupportInfo = (): VoiceSupportInfo => {
     return {
       supported: false,
       reason:
-        'Microphone needs a secure connection (HTTPS). Do not use http:// on your phone — use your Netlify link or https://.',
+        'Microphone needs a secure connection (HTTPS). On your phone, use your Netlify link or https://, not http://.',
     }
   }
 
